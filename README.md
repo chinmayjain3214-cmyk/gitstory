@@ -2,7 +2,7 @@
 
 **Every repository has a story. gitstory turns yours into one beautiful, animated HTML page.**
 
-Point it at any local git repository and get a single self-contained report: who built it, when the code gets written, which files never sit still, and a handful of fun facts. No server, no account, no dependencies, and it works offline.
+Point it at a local git repository, or paste a GitHub link, and get a single self-contained report: who built it, when the code gets written, which files never sit still, and a handful of fun facts. No account, no dependencies, and the report works offline.
 
 ![A gitstory report](docs/screenshot.png)
 
@@ -10,6 +10,8 @@ Point it at any local git repository and get a single self-contained report: who
 
 ## Features
 
+- **Web mode**: run `gitstory --serve`, paste a GitHub link into the page, confirm, and watch the story build with live progress. Download the result as a single file.
+- **GitHub links on the command line**: `gitstory https://github.com/owner/repo` clones and reports in one step.
 - **Hero summary**: repository name, first and latest commit, total commits, contributors, lines added and removed, and project age, with numbers that count up on load.
 - **Animated timeline**: commits per week, drawn left to right. Hover (or use the arrow keys) to see the week, its commit count and its top commit message.
 - **Contributors**: ranked cards with coloured avatar initials, commit and line counts, first and last active dates, and an activity sparkline.
@@ -53,8 +55,30 @@ gitstory has no runtime dependencies; `pytest` is the only thing the `dev` extra
 
 ## Usage
 
+### In the browser (web mode)
+
+```bash
+gitstory --serve --open
+```
+
+This starts a small website on your own computer (http://localhost:8765) and opens it:
+
+1. The home page explains what gitstory does and asks for a GitHub repository link.
+2. Paste a link and press **Continue**. gitstory shows which repository it found so you can check it.
+3. Press **Confirm and build the story**. The page shows each step as it happens: downloading, reading every commit, drawing the story.
+4. The story opens in the same tab, with buttons to start a **New story** or **Download HTML**.
+
+![The gitstory home page](docs/home.png)
+
+Links can be pasted the way you copy them: `https://github.com/owner/repo`, with `.git`, with a trailing slash, as a link to a file or branch (`/tree/main/src`), as an SSH remote (`git@github.com:owner/repo.git`), or as `owner/repo`.
+
+Press `Ctrl+C` in the terminal to stop the server.
+
+### On the command line
+
 ```bash
 gitstory /path/to/repo -o report.html
+gitstory https://github.com/owner/repo -o report.html
 ```
 
 Every flag:
@@ -62,6 +86,9 @@ Every flag:
 ```bash
 # Report on the current directory, written to ./gitstory.html
 gitstory
+
+# Report on a GitHub repository (cloned to a temporary folder, then deleted)
+gitstory https://github.com/psf/requests -o requests.html
 
 # Choose the repository and the output file
 gitstory ~/code/my-project -o story.html
@@ -79,6 +106,11 @@ gitstory --theme light
 # Open the report in your default browser when it is ready
 gitstory ~/code/my-project -o story.html --open
 
+# Web mode: a local website where you paste a GitHub link
+gitstory --serve
+gitstory --serve --open              # also open it in your browser
+gitstory --serve --port 9000         # another port (0 picks any free one)
+
 # Also available as a module
 python -m gitstory . -o report.html
 
@@ -88,13 +120,16 @@ gitstory --help
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `repo` | `.` | Path to a local git repository (any folder inside it works). |
+| `repo` | `.` | Path to a local git repository (any folder inside it works), or a `https://github.com/owner/repo` link. |
 | `-o`, `--output` | `gitstory.html` | Where to write the report. Missing folders are created. |
 | `--since DATE` | none | Only commits after this date. Passed through to `git log`. |
 | `--until DATE` | none | Only commits before this date. Passed through to `git log`. |
 | `--author PATTERN` | none | Only commits whose author matches. Passed through to `git log`. |
 | `--theme dark\|light` | `dark` | Theme the report opens in. |
-| `--open` | off | Open the report in the default browser afterwards. |
+| `--open` | off | Open the report in the default browser afterwards. With `--serve`, open the website. |
+| `--serve` | off | Start the web mode instead of writing a file. |
+| `--host` | `127.0.0.1` | Address the web mode listens on. |
+| `--port` | `8765` | Port the web mode listens on. `0` picks a free one. |
 | `--version` | | Print the version and exit. |
 
 Errors are short and specific, and the exit code is `1`:
@@ -103,6 +138,7 @@ Errors are short and specific, and the exit code is `1`:
 gitstory: error: not a git repository: /tmp/somewhere
 gitstory: error: this repository has no commits yet: /tmp/empty
 gitstory: error: no commits match the given --since/--until/--author filters
+gitstory: error: octocat/nope was not found on GitHub. Check the link; private repositories only work if your git credentials can access them.
 gitstory: error: git was not found. Install it from https://git-scm.com/downloads and make sure it is on your PATH.
 ```
 
@@ -131,6 +167,18 @@ git log ──► parser.py ──► stats.py ──► render.py ──► rep
 3. **`render.py`** serialises the results to one JSON blob, escapes it so that text such as `</script>` in a commit message cannot break out of the page, and inlines it together with the stylesheet and script from `gitstory/assets/` into a single HTML document.
 4. **In the browser**, a small vanilla-JS renderer reads the JSON and draws everything with DOM and SVG. Repository text is always inserted as text, never as HTML.
 
+For a GitHub link, **`github.py`** first checks the link and runs `git clone --bare --single-branch --no-tags` into a temporary folder, reading git's progress output as it goes. Steps 1 to 3 then run on that clone, and the clone is deleted.
+
+**Web mode** (`server.py`) is built on the standard library's `http.server`. The page sends the link to a small JSON API; the server checks it, starts a background job, and the page polls the job for progress until the story is ready. Finished stories are kept in memory until the server stops, so opening one again is instant.
+
+```text
+browser                          gitstory --serve
+  │  POST /api/resolve {url}  ──►  check the link   ──►  {owner, name}
+  │  POST /api/stories {url}  ──►  start a job      ──►  {id, state}
+  │  GET  /api/stories/<id>   ──►  cloning 45% … analysing … done
+  └► GET  /story/<owner>/<repo>    the report, with "New story" and "Download HTML"
+```
+
 ### Project layout
 
 ```text
@@ -142,14 +190,18 @@ gitstory/
 │   ├── parser.py          # runs git log, parses it into dataclasses
 │   ├── stats.py           # all the analysis, pure functions
 │   ├── render.py          # builds the HTML
-│   └── assets/            # template.html, report.css, report.js (package data)
+│   ├── github.py          # reads GitHub links, clones with progress
+│   ├── server.py          # web mode: home page, JSON API, background jobs
+│   └── assets/            # report and home page templates, CSS and JS (package data)
 ├── tests/
 │   ├── test_parser.py     # parses a fixed sample git-log string
 │   ├── test_stats.py      # streaks, heatmap, churn on synthetic commits
 │   ├── test_render.py     # JSON escaping, self-containment
+│   ├── test_github.py     # link parsing, clone progress and errors
+│   ├── test_server.py     # the web mode's routes and jobs, without the network
 │   └── test_cli.py        # end to end against a temporary repository
 ├── examples/
-├── docs/screenshot.png
+├── docs/                  # screenshot.png, home.png
 ├── pyproject.toml
 ├── LICENSE
 └── README.md
@@ -174,6 +226,8 @@ Where the idea left room for interpretation, these are the choices gitstory make
 - **Languages** are inferred from file extensions with a small built-in table; unknown extensions are shown as they are.
 - **Template location**: the HTML, CSS and JS live as package-data files in `gitstory/assets/` rather than in one Python string, so they get proper editor support.
 - **A theme toggle** is included in the report in addition to `--theme`.
+- **Web mode runs locally.** The repository is cloned and analysed on your own computer, so there is no hosted service to sign up for. Only `github.com` links are accepted, the server listens on `127.0.0.1` by default, and it refuses requests from other websites (it only accepts JSON and checks the `Host` header).
+- **Remote repositories**: only the default branch is cloned. The clone downloads the whole history once (needed for line counts), so very large projects take a while; the clone is stopped after 15 minutes. Private repositories work only if your own git credentials can read them; gitstory never asks for a password.
 
 Known limits: the whole `git log` output is held in memory, so repositories with hundreds of thousands of commits take a while; and a file whose name literally contains ` => ` is read as a rename.
 
@@ -183,11 +237,12 @@ Known limits: the whole `git log` output is held in memory, so repositories with
 pytest
 ```
 
-The suite covers the parser (merges, binary files, both rename notations, quoted paths, undecodable bytes, timezones), the statistics (streaks, gaps, heatmap, churn, personas, message insights, single-commit histories), the renderer (script-safe JSON, no external requests) and the CLI end to end.
+The suite covers the parser (merges, binary files, both rename notations, quoted paths, undecodable bytes, timezones), the statistics (streaks, gaps, heatmap, churn, personas, message insights, single-commit histories), the renderer (script-safe JSON, no external requests), GitHub link parsing, the web mode's API (using a local repository instead of the network) and the CLI end to end.
 
 ## Roadmap
 
-- GitHub API mode: report on a remote repository without cloning it, with pull requests and issues.
+- GitHub API mode: add pull requests, issues and releases to the story.
+- A hosted version of the web mode, so people can use it without installing anything.
 - Compare two repositories, or two periods of the same one, side by side.
 - Export the report, or single charts, as PNG.
 - `--exclude` patterns for lockfiles and generated code.
