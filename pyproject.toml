@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gitstory"
+dynamic = ["version"]
+description = "Turn any git repository's history into a beautiful, self-contained, animated HTML report."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["git", "history", "visualization", "report", "cli", "html"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Version Control :: Git",
+]
+# No runtime dependencies: gitstory only uses the standard library.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+gitstory = "gitstory.cli:main"
+
+[tool.setuptools]
+packages = ["gitstory"]
+
+[tool.setuptools.dynamic]
+version = { attr = "gitstory.__version__" }
+
+[tool.setuptools.package-data]
+gitstory = ["assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Lets a plain `pytest` find the package without installing it first.
+pythonpath = ["."]
