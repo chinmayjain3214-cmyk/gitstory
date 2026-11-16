@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+import tempfile
 import webbrowser
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from . import __version__
-from .parser import GitStoryError, get_repo_name, read_commits
+from .github import clone_repository, looks_like_github_url, parse_github_url
+from .parser import Commit, GitStoryError, NoCommitsError, get_repo_name, read_commits
 from .render import THEMES, render_report, write_report
 from .stats import build_report
 
@@ -18,11 +20,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="gitstory",
         description="Turn a git repository's history into a self-contained, animated HTML report.",
-        epilog="Example: gitstory ~/code/my-project -o story.html --since '1 year ago' --open",
+        epilog="Examples: gitstory ~/code/my-project -o story.html --open\n"
+               "          gitstory https://github.com/psf/requests\n"
+               "          gitstory --serve --open",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "repo", nargs="?", default=".",
-        help="path to a local git repository (default: the current directory)",
+        help="path to a local git repository, or a GitHub link such as "
+             "https://github.com/owner/repo (default: the current directory)",
     )
     parser.add_argument(
         "-o", "--output", default="gitstory.html", metavar="FILE",
@@ -46,10 +52,54 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--open", action="store_true", dest="open_report",
-        help="open the report in your default browser when it is ready",
+        help="open the report (or, with --serve, the website) in your default browser",
     )
+    web = parser.add_argument_group("web mode")
+    web.add_argument(
+        "--serve", action="store_true",
+        help="start a local website where you paste a GitHub link and get its story",
+    )
+    web.add_argument("--host", default="127.0.0.1", help="address to listen on with --serve (default: 127.0.0.1)")
+    web.add_argument("--port", type=int, default=8765, help="port to listen on with --serve (default: 8765; 0 picks a free one)")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser
+
+
+def _print_progress(slug: str):
+    """A callback that redraws one status line while git clones (terminals only)."""
+    if not sys.stderr.isatty():
+        return None
+
+    def report(phase: str, percent: Optional[int], size: str) -> None:
+        text = f"Cloning {slug}: {phase.lower()} {percent}%" + (f", {size}" if size else "")
+        sys.stderr.write("\r" + text[:78].ljust(78))
+        sys.stderr.flush()
+
+    return report
+
+
+def _load(args: argparse.Namespace) -> Tuple[List[Commit], str, Optional[Dict[str, str]]]:
+    """Read the commits for ``args.repo``, cloning it first if it is a GitHub link."""
+    filters = {"since": args.since, "until": args.until, "author": args.author}
+    if Path(args.repo).exists() or not looks_like_github_url(args.repo):
+        return read_commits(args.repo, **filters), get_repo_name(args.repo), None
+
+    repo = parse_github_url(args.repo, allow_shorthand=False)
+    print(f"Cloning {repo.web_url} ...", file=sys.stderr)
+    with tempfile.TemporaryDirectory(prefix="gitstory-") as folder:
+        progress = _print_progress(repo.slug)
+        try:
+            clone = clone_repository(repo, Path(folder) / "repo.git", on_progress=progress)
+        finally:
+            if progress:
+                sys.stderr.write("\r" + " " * 78 + "\r")
+        try:
+            commits = read_commits(clone, **filters)
+        except NoCommitsError as error:
+            if any(filters.values()):
+                raise
+            raise NoCommitsError(f"{repo.slug} has no commits yet") from error
+    return commits, repo.name, {"label": f"github.com/{repo.slug}", "url": repo.web_url}
 
 
 def _count(number: int, noun: str) -> str:
@@ -60,13 +110,22 @@ def _count(number: int, noun: str) -> str:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Entry point for the ``gitstory`` console script. Returns the exit code."""
     args = build_parser().parse_args(argv)
+    if args.serve:
+        from .server import serve  # imported lazily: only the web mode needs it
+
+        try:
+            return serve(args.host, args.port, open_browser=args.open_report)
+        except GitStoryError as error:
+            print(f"gitstory: error: {error}", file=sys.stderr)
+            return 1
     try:
-        commits = read_commits(args.repo, since=args.since, until=args.until, author=args.author)
-        report = build_report(commits, get_repo_name(args.repo))
+        commits, name, source = _load(args)
+        report = build_report(commits, name)
         document = render_report(
             report,
             theme=args.theme,
             filters={"since": args.since, "until": args.until, "author": args.author},
+            source=source,
         )
         output = write_report(document, args.output)
     except GitStoryError as error:

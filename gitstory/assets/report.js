@@ -125,6 +125,13 @@
   function renderHero() {
     var s = DATA.summary;
     byId('repo-name').textContent = DATA.repo_name;
+    var source = DATA.meta && DATA.meta.source;
+    if (source && /^https:\/\//.test(source.url)) {
+      var link = byId('hero-source');
+      link.href = source.url;
+      link.textContent = source.label + ' ↗';
+      link.hidden = false;
+    }
 
     append(byId('hero-lede'), [
       'It began on ', el('span', { 'class': 'date', text: fmtDay(s.first_commit) }), '. ',
@@ -648,14 +655,38 @@
       (meta.generated_at ? ' on ' + fmtDay(meta.generated_at) : '') + '.';
   }
 
+  // Pages served by `gitstory --serve` remember the theme picked on the home
+  // page. A standalone report file keeps the theme it was generated with.
+  var served = !!(DATA.meta && DATA.meta.links && DATA.meta.links.length);
+  var THEME_KEY = 'gitstory-theme';
+
   function setupTheme() {
     var button = byId('theme-toggle');
+    if (served) {
+      try {
+        var saved = window.localStorage.getItem(THEME_KEY);
+        if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+      } catch (e) { /* storage may be unavailable */ }
+    }
     function label() { button.textContent = root.getAttribute('data-theme') === 'dark' ? 'Light theme' : 'Dark theme'; }
     button.addEventListener('click', function () {
-      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      if (served) { try { window.localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ } }
       label();
     });
     label();
+  }
+
+  function renderNav() {
+    var links = (DATA.meta && DATA.meta.links) || [];
+    var nav = byId('report-nav');
+    links.forEach(function (link) {
+      // Only same-site paths: the nav is for the local web mode.
+      if (typeof link.href !== 'string' || link.href.charAt(0) !== '/' || link.href.charAt(1) === '/') return;
+      nav.appendChild(el('a', { href: link.href, text: link.label }));
+    });
+    nav.hidden = !nav.children.length;
   }
 
   function setupReveal(hooks) {
@@ -676,6 +707,7 @@
   }
 
   setupTheme();
+  renderNav();
   renderHero();
   var startTimeline = renderTimeline();
   renderContributors();

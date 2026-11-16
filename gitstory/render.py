@@ -14,14 +14,14 @@ import re
 from datetime import date, datetime
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 
 from . import __version__
 from .stats import Report
 
 THEMES = ("dark", "light")
 
-_PLACEHOLDER = re.compile(r"\{\{(TITLE|THEME|CSS|JS|DATA)\}\}")
+_PLACEHOLDER = re.compile(r"\{\{(TITLE|THEME|CSS|JS|DATA|VERSION)\}\}")
 
 # Characters that are legal inside JSON but unsafe inside an HTML <script>
 # element (or, for U+2028/U+2029, inside older JavaScript parsers). Each is
@@ -62,15 +62,34 @@ def build_payload(
     report: Report,
     generated_at: Optional[datetime] = None,
     filters: Optional[Mapping[str, Optional[str]]] = None,
+    source: Optional[Mapping[str, str]] = None,
+    links: Optional[Sequence[Mapping[str, str]]] = None,
 ) -> Dict[str, Any]:
-    """The JSON document embedded in the page: the report plus some metadata."""
+    """The JSON document embedded in the page: the report plus some metadata.
+
+    ``source`` (``{"label", "url"}``) is shown under the title, for reports of
+    a GitHub repository. ``links`` (``[{"label", "href"}]``) adds a small
+    navigation bar; the web mode uses it for "New story" and "Download".
+    """
     payload = report.to_dict()
     payload["meta"] = {
         "version": __version__,
         "generated_at": (generated_at or datetime.now().astimezone()).isoformat(timespec="seconds"),
         "filters": {key: value for key, value in (filters or {}).items() if value},
+        "source": dict(source) if source else None,
+        "links": [dict(link) for link in links] if links else [],
     }
     return payload
+
+
+def _check_theme(theme: str) -> None:
+    if theme not in THEMES:
+        raise ValueError(f"unknown theme {theme!r}; choose one of {', '.join(THEMES)}")
+
+
+def _fill(template: str, values: Mapping[str, str]) -> str:
+    # A single pass, so text inside the data can never be mistaken for a placeholder.
+    return _PLACEHOLDER.sub(lambda match: values.get(match.group(1), ""), load_asset(template))
 
 
 def render_report(
@@ -78,19 +97,31 @@ def render_report(
     theme: str = "dark",
     generated_at: Optional[datetime] = None,
     filters: Optional[Mapping[str, Optional[str]]] = None,
+    source: Optional[Mapping[str, str]] = None,
+    links: Optional[Sequence[Mapping[str, str]]] = None,
 ) -> str:
     """Return the complete HTML document for ``report`` as a string."""
-    if theme not in THEMES:
-        raise ValueError(f"unknown theme {theme!r}; choose one of {', '.join(THEMES)}")
-    values = {
+    _check_theme(theme)
+    return _fill("template.html", {
         "TITLE": html.escape(f"{report.repo_name} · gitstory"),
         "THEME": theme,
         "CSS": load_asset("report.css"),
         "JS": load_asset("report.js"),
-        "DATA": to_script_safe_json(build_payload(report, generated_at, filters)),
-    }
-    # A single pass, so text inside the data can never be mistaken for a placeholder.
-    return _PLACEHOLDER.sub(lambda match: values[match.group(1)], load_asset("template.html"))
+        "DATA": to_script_safe_json(build_payload(report, generated_at, filters, source, links)),
+    })
+
+
+def render_home(theme: str = "dark", examples: Optional[List[str]] = None) -> str:
+    """Return the web mode's landing page: what gitstory does, and a link form."""
+    _check_theme(theme)
+    return _fill("home.html", {
+        "TITLE": "gitstory · the story of any GitHub repository",
+        "THEME": theme,
+        "VERSION": html.escape(__version__),
+        "CSS": load_asset("report.css") + "\n" + load_asset("home.css"),
+        "JS": load_asset("home.js"),
+        "DATA": to_script_safe_json({"version": __version__, "examples": examples or []}),
+    })
 
 
 def write_report(document: str, output: Union[str, Path]) -> Path:
