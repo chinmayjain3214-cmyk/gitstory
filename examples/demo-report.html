@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="gitstory">
+<meta name="color-scheme" content="dark light">
+<title>orbit-demo · gitstory</title>
+<style>
+/* gitstory report styles. Everything is inlined into the generated HTML. */
+
+:root {
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --gutter: 76px;   /* space left of the content, where the history rail runs */
+  --rail-x: 34px;
+  --radius-panel: 20px;
+  --radius-card: 16px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a1020;
+  --surface: #131b33;
+  --surface-2: #1a2442;
+  --line: rgba(160, 176, 224, 0.16);
+  --ink: #eef1fa;
+  --ink-2: #c0c8e0;
+  --muted: #8d97b5;
+  --accent-a: #ff6a3d;
+  --accent-b: #ffb83d;
+  --accent: #ff8f3d;
+  --added: #2aad80;
+  --removed: #cf3550;
+  --cell-empty: rgba(160, 176, 224, 0.08);
+  --glow: rgba(255, 106, 61, 0.17);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --tooltip-bg: #232e52;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f5fa;
+  --surface: #ffffff;
+  --surface-2: #eef0f7;
+  --line: rgba(22, 32, 76, 0.13);
+  --ink: #131a33;
+  --ink-2: #39435f;
+  --muted: #5f6987;
+  --accent-a: #e2431e;
+  --accent-b: #cf7a00;
+  --accent: #dc5a12;
+  --added: #18a877;
+  --removed: #c22946;
+  --cell-empty: rgba(22, 32, 76, 0.07);
+  --glow: rgba(226, 67, 30, 0.12);
+  --shadow: 0 1px 2px rgba(22, 32, 76, 0.05), 0 16px 36px -24px rgba(22, 32, 76, 0.35);
+  --tooltip-bg: #ffffff;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(60rem 34rem at 88% -12rem, var(--glow), transparent 62%),
+    var(--bg);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, p, ol, ul { margin: 0; }
+ol, ul { padding: 0; list-style: none; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.gradient-text {
+  background: linear-gradient(100deg, var(--accent-a), var(--accent-b));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- Page frame and the history rail ---------- */
+
+.story {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 28px 4rem var(--gutter);
+}
+
+/* A vertical line with a node at every chapter, like a commit graph. */
+.story::before {
+  content: "";
+  position: absolute;
+  left: var(--rail-x);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent 0, var(--accent-a) 7rem, var(--accent-b) 45%, var(--line) 100%);
+}
+
+.hero-title, .chapter-title { position: relative; }
+
+.hero-title::before, .chapter-title::before {
+  content: "";
+  position: absolute;
+  top: 0.6em;
+  left: calc(var(--rail-x) - var(--gutter) - 5px);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  transform: translateY(-50%);
+}
+
+.hero-title::before {
+  left: calc(var(--rail-x) - var(--gutter) - 8px);
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  box-shadow: 0 0 0 5px var(--bg), 0 0 26px 4px var(--glow);
+}
+
+.theme-toggle {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 5;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--muted); }
+
+/* ---------- Hero ---------- */
+
+.hero { padding: clamp(5rem, 15vh, 9rem) 0 clamp(3rem, 8vh, 5rem); }
+
+.hero-kicker {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--muted);
+}
+
+.hero-title {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(2.75rem, 9.5vw, 6.25rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  padding-bottom: 0.08em;
+}
+
+.hero-lede {
+  max-width: 38ch;
+  margin-top: 1.75rem;
+  font-family: var(--serif);
+  font-size: clamp(1.3rem, 2.7vw, 1.95rem);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.hero-lede .num, .hero-lede .date { white-space: nowrap; }
+.hero-lede .date { color: var(--ink); }
+.hero-lede .num {
+  display: inline-block;
+  text-align: center;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.hero-diffstat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  margin-top: 2rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+.hero-diffstat strong {
+  display: inline-block;
+  color: var(--ink);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+.diffbar {
+  display: flex;
+  gap: 2px;
+  width: min(220px, 100%);
+  height: 8px;
+}
+.diffbar i { display: block; height: 100%; min-width: 3px; border-radius: 4px; }
+.diffbar .is-added, .swatch.is-added, .bar-fill .is-added { background: var(--added); }
+.diffbar .is-removed, .swatch.is-removed, .bar-fill .is-removed { background: var(--removed); }
+
+.hero-filters { margin-top: 1rem; color: var(--muted); font-size: 0.875rem; }
+
+/* ---------- Chapters ---------- */
+
+.chapter { padding: clamp(2.5rem, 7vh, 4.25rem) 0 0; }
+
+.chapter-title {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(1.6rem, 3.6vw, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.chapter-lede {
+  max-width: 68ch;
+  margin-top: 0.5rem;
+  color: var(--muted);
+}
+.chapter-lede:empty { display: none; }
+
+.chapter > .panel,
+.chapter > .people,
+.chapter > .rhythm,
+.chapter > .churn,
+.chapter > .tiles,
+.chapter > .facts { margin-top: 1.5rem; }
+
+.panel {
+  min-width: 0;
+  padding: 22px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.panel-title {
+  font-size: 1rem;
+  font-weight: 650;
+  margin-bottom: 0.75rem;
+}
+
+.mono { font-family: var(--mono); font-size: 0.92em; }
+.empty { color: var(--muted); font-size: 0.9375rem; }
+
+/* ---------- Timeline ---------- */
+
+.timeline-chart { position: relative; min-height: 220px; }
+.timeline-chart svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+.timeline-chart svg:focus-visible { outline-offset: 6px; }
+
+.tl-grid { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
+.tl-label { fill: var(--muted); font-size: 12px; font-family: var(--sans); font-variant-numeric: tabular-nums; }
+.tl-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.tl-guide { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; }
+.tl-dot { fill: var(--accent-b); stroke: var(--surface); stroke-width: 2; }
+.tl-bar { transition: opacity 0.15s; }
+.tl-bars.has-active .tl-bar { opacity: 0.45; }
+.tl-bars.has-active .tl-bar.is-active { opacity: 1; }
+.stop-a { stop-color: var(--accent-a); }
+.stop-b { stop-color: var(--accent-b); }
+
+/* ---------- Contributors ---------- */
+
+.people {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+  gap: 16px;
+}
+
+.person {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 20px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.person-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: 0.02em;
+}
+
+.person-name {
+  min-width: 0;
+  flex: 1;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.person-rank { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.875rem; }
+.person:first-child .person-rank { color: var(--accent); font-weight: 700; }
+
+.person-stats { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
+.person-commits { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.person-commits small { margin-left: 5px; font-size: 0.8125rem; font-weight: 400; color: var(--muted); }
+.person-lines { color: var(--ink-2); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.person-lines .swatch { margin: 0 5px 0 8px; }
+.person-lines .swatch:first-child { margin-left: 0; }
+
+.spark { display: block; width: 100%; height: 38px; overflow: visible; }
+.spark-line { fill: none; stroke: var(--accent); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.spark-area { fill: var(--accent); opacity: 0.16; }
+
+.person-dates { color: var(--muted); font-size: 0.8125rem; }
+
+.people-more { margin-top: 1rem; color: var(--muted); font-size: 0.9375rem; }
+.people-more:empty { display: none; }
+.people-more button {
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.people-more button:hover { border-color: var(--muted); }
+
+.swatch { display: inline-block; width: 9px; height: 9px; border-radius: 3px; }
+
+/* ---------- Heatmap ---------- */
+
+.rhythm > .panel { display: flex; flex-direction: column; justify-content: center; }
+.rhythm { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); gap: 16px; align-items: stretch; }
+
+.heatmap { display: grid; grid-template-columns: 2.4rem repeat(24, minmax(0, 1fr)); gap: 3px; align-items: center; }
+.hm-hour, .hm-day { color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; line-height: 1; }
+.hm-hour { padding-bottom: 4px; white-space: nowrap; }
+.hm-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: var(--cell-empty);
+}
+.hm-cell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  opacity: var(--v, 0);
+}
+.hm-cell:hover { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+.heatmap-legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 14px; color: var(--muted); font-size: 0.75rem; }
+.heatmap-legend .hm-cell { width: 12px; }
+.heatmap-legend span:first-child { margin-right: 4px; }
+.heatmap-legend span:last-child { margin-left: 4px; }
+
+.persona {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--line);
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  box-shadow: var(--shadow);
+}
+.persona-emoji { font-size: 2.75rem; line-height: 1.1; }
+.persona-label { font-family: var(--serif); font-size: 1.75rem; font-weight: 600; line-height: 1.15; }
+.persona-text { color: var(--ink-2); font-size: 0.9375rem; }
+.persona-peak { margin-top: 8px; color: var(--muted); font-size: 0.875rem; }
+
+/* ---------- Bar lists (files, languages, words) ---------- */
+
+.churn { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+
+.legend { display: flex; gap: 18px; margin-bottom: 14px; color: var(--ink-2); font-size: 0.8125rem; }
+.legend .swatch { margin-right: 6px; }
+
+.bars { display: grid; gap: 13px; }
+.bars.is-two-col { grid-auto-flow: column; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(var(--rows, 6), auto); column-gap: 28px; }
+.bar-row { min-width: 0; }
+.bar-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 5px; font-size: 0.875rem; }
+.bar-label { display: flex; align-items: baseline; min-width: 0; color: var(--ink); }
+.bar-label .path-dir { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
+.bar-label .path-name { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-label .hint { margin-left: 8px; color: var(--muted); }
+.bar-value { flex: none; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar-value small { margin-left: 8px; color: var(--muted); font-size: 0.8125rem; }
+
+.bar-track { height: 10px; border-radius: 4px; background: var(--cell-empty); }
+.bar-fill {
+  display: flex;
+  gap: 2px;
+  height: 100%;
+  width: var(--w, 0%);
+  min-width: 4px;
+  border-radius: 4px;
+  transform-origin: left center;
+}
+.bar-fill.is-solid { background: linear-gradient(90deg, var(--accent-a), var(--accent-b)); }
+.bar-fill i { display: block; height: 100%; min-width: 2px; border-radius: 4px; }
+
+/* ---------- Commit messages ---------- */
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; align-items: start; }
+.tile {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.tile-value { font-size: 2rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile-value small { margin-left: 6px; font-size: 0.9375rem; font-weight: 400; color: var(--muted); }
+.tile-label { margin-top: 4px; color: var(--ink-2); font-size: 0.9375rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.chip { padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); font-size: 0.8125rem; }
+.chip b { color: var(--ink); font-weight: 650; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+.messages { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; align-items: start; }
+.quotes { display: grid; gap: 16px; min-width: 0; }
+.quote {
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px var(--radius-card) var(--radius-card) 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.quote-kind { color: var(--muted); font-size: 0.875rem; }
+.quote-text {
+  margin: 8px 0 10px;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.quote-meta { color: var(--muted); font-size: 0.8125rem; }
+
+/* ---------- Fun facts ---------- */
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 1fr)); gap: 16px; }
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 20px 22px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.fact-emoji { font-size: 1.6rem; line-height: 1.2; }
+.fact-title { color: var(--ink-2); font-size: 0.9375rem; }
+.fact-value { font-family: var(--serif); font-size: 2.1rem; font-weight: 600; line-height: 1.15; }
+.fact-detail { margin-top: 4px; color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.fact-detail q { color: var(--ink-2); }
+
+/* ---------- Footer, tooltip ---------- */
+
+.footer {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 2rem 28px 3rem var(--gutter);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.footer strong { color: var(--ink-2); font-weight: 650; }
+
+.tooltip {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  left: 0;
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--tooltip-bg);
+  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.55);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.tooltip strong { display: block; color: var(--ink); font-size: 0.9375rem; }
+.tooltip em { display: block; margin-top: 6px; color: var(--ink-2); overflow-wrap: anywhere; }
+
+.noscript { max-width: 40rem; margin: 2rem auto; padding: 0 1.5rem; color: var(--ink-2); }
+
+/* ---------- Motion ---------- */
+
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.reveal.is-visible { opacity: 1; transform: none; }
+
+.reveal .bar-fill { transform: scaleX(0); transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); transition-delay: calc(var(--i, 0) * 35ms + 150ms); }
+.reveal.is-visible .bar-fill { transform: none; }
+
+.reveal .hm-cell::after { opacity: 0; transition: opacity 0.5s ease; transition-delay: calc(var(--col, 0) * 22ms + 150ms); }
+.reveal.is-visible .hm-cell::after { opacity: var(--v, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal .bar-fill, .reveal .hm-cell::after, .tl-bar { transition: none; }
+  .reveal { opacity: 1; transform: none; }
+  .reveal .bar-fill { transform: none; }
+  .reveal .hm-cell::after { opacity: var(--v, 0); }
+}
+
+/* ---------- Smaller screens ---------- */
+
+@media (max-width: 860px) {
+  .rhythm, .churn, .messages { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  :root { --gutter: 40px; --rail-x: 15px; --radius-panel: 16px; }
+  .story { padding-right: 16px; }
+  .footer { padding-right: 16px; }
+  .panel { padding: 16px 14px 18px; }
+  .heatmap { grid-template-columns: 1.9rem repeat(24, minmax(0, 1fr)); gap: 2px; }
+  .hm-cell { border-radius: 2px; }
+  .hm-hour, .hm-day { font-size: 0.6875rem; }
+  .theme-toggle { top: 12px; right: 12px; }
+  .bar-value small { display: none; }
+  .bars.is-two-col { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+}
+
+@media print {
+  .reveal { opacity: 1 !important; transform: none !important; }
+  .theme-toggle, .tooltip { display: none !important; }
+}
+
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="theme-toggle" type="button">Light theme</button>
+
+<main class="story">
+  <header class="hero">
+    <p class="hero-kicker">The story of</p>
+    <h1 class="hero-title" id="repo-name"></h1>
+    <p class="hero-lede" id="hero-lede"></p>
+    <div class="hero-diffstat" id="hero-diffstat"></div>
+    <p class="hero-filters" id="hero-filters" hidden></p>
+  </header>
+
+  <section class="chapter reveal" id="timeline" aria-labelledby="timeline-title">
+    <h2 class="chapter-title" id="timeline-title">Timeline</h2>
+    <p class="chapter-lede" id="timeline-lede"></p>
+    <div class="panel">
+      <div class="timeline-chart" id="timeline-chart"></div>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="contributors" aria-labelledby="contributors-title">
+    <h2 class="chapter-title" id="contributors-title">Contributors</h2>
+    <p class="chapter-lede" id="contributors-lede"></p>
+    <ol class="people" id="people"></ol>
+    <div class="people-more" id="people-more"></div>
+  </section>
+
+  <section class="chapter reveal" id="rhythm" aria-labelledby="rhythm-title">
+    <h2 class="chapter-title" id="rhythm-title">When the code gets written</h2>
+    <p class="chapter-lede" id="rhythm-lede"></p>
+    <div class="rhythm">
+      <div class="panel">
+        <div class="heatmap" id="heatmap"></div>
+        <div class="heatmap-legend" id="heatmap-legend"></div>
+      </div>
+      <aside class="persona" id="persona"></aside>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="churn" aria-labelledby="churn-title">
+    <h2 class="chapter-title" id="churn-title">File churn</h2>
+    <p class="chapter-lede" id="churn-lede"></p>
+    <div class="churn">
+      <div class="panel">
+        <h3 class="panel-title">Most-changed files</h3>
+        <div class="legend" id="churn-legend"></div>
+        <ol class="bars" id="churn-files"></ol>
+      </div>
+      <div class="panel">
+        <h3 class="panel-title">Languages by lines changed</h3>
+        <ol class="bars" id="churn-extensions"></ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="messages" aria-labelledby="messages-title">
+    <h2 class="chapter-title" id="messages-title">Commit message insights</h2>
+    <p class="chapter-lede" id="messages-lede"></p>
+    <div class="tiles" id="message-tiles"></div>
+    <div class="messages">
+      <div class="panel">
+        <h3 class="panel-title">Most common words</h3>
+        <ol class="bars" id="message-words"></ol>
+      </div>
+      <div class="quotes" id="message-quotes"></div>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="facts" aria-labelledby="facts-title">
+    <h2 class="chapter-title" id="facts-title">Fun facts</h2>
+    <div class="facts" id="fact-cards"></div>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>Generated by <strong>gitstory</strong><span id="footer-meta"></span></p>
+</footer>
+
+<div class="tooltip" id="tooltip" role="status" aria-live="polite" hidden></div>
+<noscript><p class="noscript">This report draws its charts with JavaScript. Enable JavaScript to see it.</p></noscript>
+
+<script id="gitstory-data" type="application/json">{"repo_name":"orbit-demo","summary":{"commits":361,"contributors":5,"merges":0,"files_touched":22,"lines_added":16334,"lines_removed":4798,"first_commit":"2024-11-04T10:25:03+01:00","last_commit":"2026-10-24T10:11:03+01:00","age_days":719},"timeline":[{"start":"2024-11-04","commits":8,"lines_added":402,"lines_removed":4,"top_message":"feat: support keyboard shortcuts in the api"},{"start":"2024-11-11","commits":7,"lines_added":508,"lines_removed":17,"top_message":"feat: support the export command in the api"},{"start":"2024-11-18","commits":7,"lines_added":213,"lines_removed":11,"top_message":"Rewrite retry logic so that it no longer blocks the event loop when the queue is full"},{"start":"2024-11-25","commits":7,"lines_added":241,"lines_removed":33,"top_message":"fix: correct off-by-one in error messages"},{"start":"2024-12-02","commits":8,"lines_added":255,"lines_removed":75,"top_message":"refactor(api): split retry logic into smaller functions"},{"start":"2024-12-09","commits":9,"lines_added":399,"lines_removed":86,"top_message":"perf(core): cache results for the scheduler queue"},{"start":"2024-12-16","commits":6,"lines_added":306,"lines_removed":55,"top_message":"feat(web): support the export command in the api"},{"start":"2024-12-23","commits":7,"lines_added":240,"lines_removed":51,"top_message":"Fix typo"},{"start":"2024-12-30","commits":6,"lines_added":157,"lines_removed":93,"top_message":"chore(web): tidy ci config"},{"start":"2025-01-06","commits":7,"lines_added":372,"lines_removed":131,"top_message":"Clean up rate limiting"},{"start":"2025-01-13","commits":5,"lines_added":186,"lines_removed":44,"top_message":"fix(core): stop the scheduler queue from crashing on restart"},{"start":"2025-01-20","commits":5,"lines_added":276,"lines_removed":138,"top_message":"Rework the export command after review feedback"},{"start":"2025-01-27","commits":9,"lines_added":404,"lines_removed":200,"top_message":"fix: stop sidebar filters from crashing on restart"},{"start":"2025-02-03","commits":8,"lines_added":217,"lines_removed":113,"top_message":"test: cover pagination edge cases"},{"start":"2025-02-10","commits":2,"lines_added":110,"lines_removed":30,"top_message":"test: cover the scheduler queue edge cases"},{"start":"2025-02-17","commits":11,"lines_added":792,"lines_removed":226,"top_message":"feat: support error messages in the api"},{"start":"2025-02-24","commits":6,"lines_added":316,"lines_removed":91,"top_message":"Remove dead code around sqlite migrations"},{"start":"2025-03-03","commits":2,"lines_added":146,"lines_removed":3,"top_message":"fix(core): handle empty input in timeline zoom"},{"start":"2025-03-10","commits":2,"lines_added":112,"lines_removed":39,"top_message":"feat: introduce sidebar filters"},{"start":"2025-03-17","commits":2,"lines_added":142,"lines_removed":75,"top_message":"fix(core): correct off-by-one in the job runner"},{"start":"2025-03-24","commits":1,"lines_added":30,"lines_removed":0,"top_message":"fix(api): handle empty input in login flow"},{"start":"2025-03-31","commits":4,"lines_added":160,"lines_removed":88,"top_message":"WIP"},{"start":"2025-04-07","commits":1,"lines_added":16,"lines_removed":0,"top_message":"docs: update readme for pagination"},{"start":"2025-04-14","commits":2,"lines_added":83,"lines_removed":73,"top_message":"perf(web): cache results for the export command"},{"start":"2025-04-21","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2025-04-28","commits":1,"lines_added":88,"lines_removed":38,"top_message":"feat(api): support login flow in the api"},{"start":"2025-05-05","commits":2,"lines_added":55,"lines_removed":25,"top_message":"Rework keyboard shortcuts after review feedback"},{"start":"2025-05-12","commits":1,"lines_added":31,"lines_removed":13,"top_message":"feat: introduce keyboard shortcuts"},{"start":"2025-05-19","commits":1,"lines_added":67,"lines_removed":41,"top_message":"Fix typo"},{"start":"2025-05-26","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2025-06-02","commits":1,"lines_added":69,"lines_removed":47,"top_message":"feat: add timeline zoom"},{"start":"2025-06-09","commits":1,"lines_added":2,"lines_removed":0,"top_message":"Update login flow"},{"start":"2025-06-16","commits":2,"lines_added":112,"lines_removed":2,"top_message":"test: cover sqlite migrations edge cases"},{"start":"2025-06-23","commits":4,"lines_added":162,"lines_removed":16,"top_message":"chore: tidy ci config"},{"start":"2025-06-30","commits":1,"lines_added":15,"lines_removed":20,"top_message":"Make sidebar filters faster"},{"start":"2025-07-07","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2025-07-14","commits":1,"lines_added":120,"lines_removed":6,"top_message":"fix: correct off-by-one in the export command"},{"start":"2025-07-21","commits":2,"lines_added":80,"lines_removed":46,"top_message":"feat(web): add pagination"},{"start":"2025-07-28","commits":2,"lines_added":55,"lines_removed":8,"top_message":"test: cover sqlite migrations edge cases"},{"start":"2025-08-04","commits":5,"lines_added":441,"lines_removed":88,"top_message":"chore: tidy ci config"},{"start":"2025-08-11","commits":6,"lines_added":283,"lines_removed":79,"top_message":"feat: add keyboard shortcuts"},{"start":"2025-08-18","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2025-08-25","commits":1,"lines_added":15,"lines_removed":0,"top_message":"Update sidebar filters"},{"start":"2025-09-01","commits":4,"lines_added":159,"lines_removed":54,"top_message":"fix(api): stop search indexing from crashing on restart"},{"start":"2025-09-08","commits":2,"lines_added":135,"lines_removed":40,"top_message":"Oops, forgot a file"},{"start":"2025-09-15","commits":2,"lines_added":141,"lines_removed":7,"top_message":"feat(web): add keyboard shortcuts"},{"start":"2025-09-22","commits":5,"lines_added":378,"lines_removed":154,"top_message":"Update sidebar filters"},{"start":"2025-09-29","commits":1,"lines_added":27,"lines_removed":22,"top_message":"Remove dead code around the job runner"},{"start":"2025-10-06","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2025-10-13","commits":1,"lines_added":54,"lines_removed":12,"top_message":"Update pagination"},{"start":"2025-10-20","commits":4,"lines_added":127,"lines_removed":16,"top_message":"fix: correct off-by-one in retry logic"},{"start":"2025-10-27","commits":1,"lines_added":35,"lines_removed":23,"top_message":"Remove dead code around dark mode"},{"start":"2025-11-03","commits":1,"lines_added":3,"lines_removed":18,"top_message":"test(core): cover login flow edge cases"},{"start":"2025-11-10","commits":2,"lines_added":50,"lines_removed":24,"top_message":"fix: stop login flow from crashing on restart"},{"start":"2025-11-17","commits":1,"lines_added":17,"lines_removed":0,"top_message":"test(web): cover timeline zoom edge cases"},{"start":"2025-11-24","commits":2,"lines_added":113,"lines_removed":30,"top_message":"test(api): cover timeline zoom edge cases"},{"start":"2025-12-01","commits":2,"lines_added":43,"lines_removed":0,"top_message":"feat(core): add pagination"},{"start":"2025-12-08","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2025-12-15","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2025-12-22","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2025-12-29","commits":0,"lines_added":0,"lines_removed":0,"top_message":""},{"start":"2026-01-05","commits":1,"lines_added":116,"lines_removed":0,"top_message":"WIP"},{"start":"2026-01-12","commits":6,"lines_added":241,"lines_removed":9,"top_message":"fix(web): stop dark mode from crashing on restart"},{"start":"2026-01-19","commits":6,"lines_added":247,"lines_removed":69,"top_message":"docs: explain error messages in the guide"},{"start":"2026-01-26","commits":4,"lines_added":112,"lines_removed":67,"top_message":"Fix typo"},{"start":"2026-02-02","commits":6,"lines_added":152,"lines_removed":31,"top_message":"fix: stop the job runner from crashing on restart"},{"start":"2026-02-09","commits":4,"lines_added":302,"lines_removed":75,"top_message":"Oops, forgot a file"},{"start":"2026-02-16","commits":9,"lines_added":301,"lines_removed":115,"top_message":"feat(core): add the scheduler queue"},{"start":"2026-02-23","commits":3,"lines_added":146,"lines_removed":56,"top_message":"Make sidebar filters faster"},{"start":"2026-03-02","commits":5,"lines_added":166,"lines_removed":75,"top_message":"Rewrite retry logic so that it no longer blocks the event loop when the queue is full"},{"start":"2026-03-09","commits":1,"lines_added":29,"lines_removed":15,"top_message":"fix(api): handle empty input in sidebar filters"},{"start":"2026-03-16","commits":4,"lines_added":188,"lines_removed":35,"top_message":"Rewrite the scheduler queue so that it no longer blocks the event loop when the queue is full"},{"start":"2026-03-23","commits":7,"lines_added":227,"lines_removed":99,"top_message":"fix(web): correct off-by-one in keyboard shortcuts"},{"start":"2026-03-30","commits":4,"lines_added":121,"lines_removed":135,"top_message":"refactor(core): split the export command into smaller functions"},{"start":"2026-04-06","commits":6,"lines_added":96,"lines_removed":58,"top_message":"Make token refresh faster"},{"start":"2026-04-13","commits":6,"lines_added":133,"lines_removed":24,"top_message":"chore: tidy ci config"},{"start":"2026-04-20","commits":3,"lines_added":132,"lines_removed":17,"top_message":"feat(core): support login flow in the api"},{"start":"2026-04-27","commits":4,"lines_added":76,"lines_removed":48,"top_message":"Rework sqlite migrations after review feedback"},{"start":"2026-05-04","commits":3,"lines_added":73,"lines_removed":40,"top_message":"chore(web): bump dependencies"},{"start":"2026-05-11","commits":7,"lines_added":341,"lines_removed":34,"top_message":"Update keyboard shortcuts"},{"start":"2026-05-18","commits":3,"lines_added":97,"lines_removed":30,"top_message":"feat: support sqlite migrations in the api"},{"start":"2026-05-25","commits":3,"lines_added":77,"lines_removed":75,"top_message":"Rewrite the scheduler queue so that it no longer blocks the event loop when the queue is full"},{"start":"2026-06-01","commits":4,"lines_added":102,"lines_removed":34,"top_message":"fix: stop login flow from crashing on restart"},{"start":"2026-06-08","commits":3,"lines_added":114,"lines_removed":69,"top_message":"feat(web): add the job runner"},{"start":"2026-06-15","commits":5,"lines_added":271,"lines_removed":59,"top_message":"Rework the job runner after review feedback"},{"start":"2026-06-22","commits":4,"lines_added":119,"lines_removed":76,"top_message":"fix: handle empty input in dark mode"},{"start":"2026-06-29","commits":5,"lines_added":362,"lines_removed":84,"top_message":"fix: handle empty input in retry logic"},{"start":"2026-07-06","commits":4,"lines_added":146,"lines_removed":77,"top_message":"Rework pagination after review feedback"},{"start":"2026-07-13","commits":4,"lines_added":140,"lines_removed":60,"top_message":"Clean up token refresh"},{"start":"2026-07-20","commits":2,"lines_added":170,"lines_removed":0,"top_message":"fix(api): handle empty input in the job runner"},{"start":"2026-07-27","commits":2,"lines_added":90,"lines_removed":7,"top_message":"Clean up dark mode"},{"start":"2026-08-03","commits":3,"lines_added":110,"lines_removed":83,"top_message":"docs: update readme for search indexing"},{"start":"2026-08-10","commits":5,"lines_added":372,"lines_removed":124,"top_message":"feat: support the job runner in the api"},{"start":"2026-08-17","commits":2,"lines_added":71,"lines_removed":20,"top_message":"refactor(api): simplify error messages"},{"start":"2026-08-24","commits":3,"lines_added":170,"lines_removed":27,"top_message":"feat(core): introduce sqlite migrations"},{"start":"2026-08-31","commits":2,"lines_added":48,"lines_removed":26,"top_message":"WIP"},{"start":"2026-09-07","commits":2,"lines_added":160,"lines_removed":30,"top_message":"test(core): cover timeline zoom edge cases"},{"start":"2026-09-14","commits":3,"lines_added":149,"lines_removed":15,"top_message":"Remove dead code around sidebar filters"},{"start":"2026-09-21","commits":7,"lines_added":344,"lines_removed":164,"top_message":"docs(web): explain the scheduler queue in the guide"},{"start":"2026-09-28","commits":3,"lines_added":390,"lines_removed":89,"top_message":"Clean up dark mode"},{"start":"2026-10-05","commits":4,"lines_added":277,"lines_removed":67,"top_message":"feat: support error messages in the api"},{"start":"2026-10-12","commits":5,"lines_added":250,"lines_removed":30,"top_message":"Rewrite the scheduler queue so that it no longer blocks the event loop when the queue is full"},{"start":"2026-10-19","commits":3,"lines_added":146,"lines_removed":45,"top_message":"Oops, forgot a file"}],"contributors":[{"name":"Ada Okafor","initials":"AO","color":"hsl(213, 58%, 46%)","commits":161,"lines_added":7289,"lines_removed":2202,"first_active":"2024-11-04","last_active":"2026-10-24","sparkline":[28,18,12,13,3,3,1,1,1,4,6,2,3,0,2,11,6,6,6,6,8,5,6,10]},{"name":"Mateus Lindqvist","initials":"ML","color":"hsl(46, 58%, 46%)","commits":110,"lines_added":4930,"lines_removed":1630,"first_active":"2024-11-26","last_active":"2026-10-17","sparkline":[3,13,17,9,3,3,1,5,2,2,3,0,2,2,4,4,4,5,6,4,3,5,7,3]},{"name":"Priya Raman","initials":"PR","color":"hsl(284, 58%, 46%)","commits":46,"lines_added":1991,"lines_removed":476,"first_active":"2025-02-06","last_active":"2026-08-05","sparkline":[0,0,0,6,1,1,2,1,0,4,3,3,0,0,2,5,4,3,4,2,3,2,0,0]},{"name":"Yuki Tanabe","initials":"YT","color":"hsl(23, 58%, 46%)","commits":35,"lines_added":1886,"lines_removed":328,"first_active":"2025-06-06","last_active":"2026-10-07","sparkline":[0,0,0,0,0,0,0,2,1,3,2,0,1,1,3,3,1,3,3,5,1,1,1,4]},{"name":"Tomás Herrera","initials":"TH","color":"hsl(108, 58%, 46%)","commits":9,"lines_added":238,"lines_removed":162,"first_active":"2026-01-13","last_active":"2026-04-07","sparkline":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,2,2,0,0,0,0,0,0]}],"heatmap":[[1,0,0,1,2,1,2,4,2,3,2,4,5,3,0,3,4,2,4,1,2,1,0,0],[1,1,0,1,0,3,2,4,5,6,3,3,5,3,4,5,3,3,3,3,3,0,0,2],[2,1,1,1,1,1,2,4,7,10,10,4,3,5,4,3,3,1,3,0,3,4,2,2],[1,0,0,0,0,2,4,5,3,10,9,3,2,4,2,3,3,4,4,2,0,3,4,0],[0,0,1,0,0,2,4,3,2,7,6,5,7,6,3,4,5,2,3,3,0,2,0,2],[0,0,0,0,0,0,1,0,1,4,3,5,0,1,0,2,0,2,0,0,1,0,0,0],[0,1,0,0,0,1,0,1,2,0,3,1,1,0,1,1,2,1,1,1,1,1,0,0]],"persona":{"label":"Round-the-clock coder","emoji":"🌍","description":"Commits are spread across the whole day, with no single favourite time."},"files":[{"path":"orbit/core.py","lines_added":1248,"lines_removed":370,"commits":41},{"path":"orbit/cli.py","lines_added":1060,"lines_removed":270,"commits":40},{"path":"orbit/api/routes.py","lines_added":1056,"lines_removed":180,"commits":35},{"path":".github/workflows/ci.yml","lines_added":919,"lines_removed":284,"commits":38},{"path":"orbit/scheduler.py","lines_added":885,"lines_removed":288,"commits":36},{"path":"orbit/storage/database.py","lines_added":869,"lines_removed":252,"commits":32},{"path":"tests/test_scheduler.py","lines_added":821,"lines_removed":285,"commits":41},{"path":"web/src/components/Timeline.tsx","lines_added":885,"lines_removed":200,"commits":38},{"path":"web/src/styles.css","lines_added":805,"lines_removed":271,"commits":41},{"path":"Makefile","lines_added":849,"lines_removed":188,"commits":40},{"path":"web/src/App.tsx","lines_added":723,"lines_removed":301,"commits":34},{"path":"tests/test_core.py","lines_added":817,"lines_removed":188,"commits":34},{"path":"tests/test_api.py","lines_added":786,"lines_removed":190,"commits":35},{"path":"README.md","lines_added":662,"lines_removed":313,"commits":33},{"path":"web/index.html","lines_added":681,"lines_removed":267,"commits":32}],"extensions":[{"extension":".py","language":"Python","lines_changed":10489,"files":10,"share":0.4963562369865607},{"extension":".tsx","language":"TypeScript","lines_changed":3009,"files":3,"share":0.14239068710959682},{"extension":".md","language":"Markdown","lines_changed":2649,"files":3,"share":0.1253549119818285},{"extension":".yml","language":"YAML","lines_changed":1203,"files":1,"share":0.05692788188529245},{"extension":".css","language":"CSS","lines_changed":1076,"files":1,"share":0.050918038992996406},{"extension":"(no extension)","language":"(no extension)","lines_changed":1037,"files":1,"share":0.04907249668748817},{"extension":".html","language":"HTML","lines_changed":948,"files":1,"share":0.044860874503123226},{"extension":".toml","language":"TOML","lines_changed":721,"files":1,"share":0.03411887185311376}],"messages":{"analysed":361,"average_length":37.3,"average_words":5.9,"common_words":[{"word":"queue","count":40},{"word":"cases","count":28},{"word":"cover","count":28},{"word":"edge","count":28},{"word":"error","count":28},{"word":"filters","count":28},{"word":"messages","count":28},{"word":"sidebar","count":28},{"word":"logic","count":25},{"word":"retry","count":25},{"word":"update","count":25},{"word":"crashing","count":24}],"conventional_count":230,"conventional_share":0.6371191135734072,"conventional_types":[{"type":"feat","count":63},{"type":"fix","count":63},{"type":"test","count":28},{"type":"docs","count":25},{"type":"chore","count":22},{"type":"refactor","count":19},{"type":"perf","count":10}],"longest":{"text":"Rewrite the scheduler queue so that it no longer blocks the event loop when the queue is full","hash":"c5ad0e1","author":"Ada Okafor","when":"2026-03-20T12:48:52+01:00","length":93},"shortest":{"text":"WIP","hash":"083f6de","author":"Ada Okafor","when":"2024-11-18T09:29:28+01:00","length":3}},"facts":{"biggest_commit":{"hash":"3dc93e5","subject":"Update sidebar filters","author":"Mateus Lindqvist","when":"2025-09-23T15:26:32-03:00","lines_added":234,"lines_removed":80,"files":5},"longest_streak":{"days":6,"start":"2024-12-02","end":"2024-12-07"},"longest_gap":{"seconds":2995328,"start":"2025-12-05T13:23:53-03:00","end":"2026-01-09T09:26:01+01:00"},"busiest_day":{"day":"2025-01-31","commits":5}},"meta":{"version":"0.1.0","generated_at":"2026-11-16T18:20:18+00:00","filters":{}}}</script>
+<script>
+/* gitstory report renderer. Reads the embedded JSON and draws everything with
+   plain DOM and SVG. Every string that comes from the repository is inserted
+   with textContent, never as HTML. */
+(function () {
+  'use strict';
+
+  var DATA = JSON.parse(document.getElementById('gitstory-data').textContent);
+  var root = document.documentElement;
+  var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var DAYS_LONG = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // ---------------------------------------------------------------- helpers
+
+  function append(node, children) {
+    if (children == null) return node;
+    (Array.isArray(children) ? children : [children]).forEach(function (child) {
+      if (child == null || child === false) return;
+      node.appendChild(typeof child === 'object' ? child : document.createTextNode(String(child)));
+    });
+    return node;
+  }
+
+  function setAttrs(node, attrs) {
+    for (var key in attrs) {
+      var value = attrs[key];
+      if (value == null || value === false) continue;
+      if (key === 'text') node.textContent = value;
+      else node.setAttribute(key, value);
+    }
+  }
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    if (attrs) setAttrs(node, attrs);
+    return append(node, children);
+  }
+
+  function svg(tag, attrs, children) {
+    var node = document.createElementNS(SVG_NS, tag);
+    if (attrs) setAttrs(node, attrs);
+    return append(node, children);
+  }
+
+  function byId(id) { return document.getElementById(id); }
+
+  function fmtNum(n) { return Number(n).toLocaleString('en-US'); }
+  function plural(n, one, many) { return n === 1 ? one : many; }
+  function count(n, one, many) { return fmtNum(n) + ' ' + plural(n, one, many); }
+
+  // Dates arrive as ISO strings in the author's own timezone; the first ten
+  // characters are the local calendar day, so no Date parsing (and no
+  // timezone shifting) is needed to print them.
+  function dayParts(iso) {
+    var p = iso.slice(0, 10).split('-');
+    return { y: +p[0], m: +p[1], d: +p[2] };
+  }
+  function fmtDay(iso) { var t = dayParts(iso); return t.d + ' ' + MONTHS[t.m - 1] + ' ' + t.y; }
+  function fmtDayShort(iso) { var t = dayParts(iso); return t.d + ' ' + MONTHS[t.m - 1]; }
+  function fmtMonth(iso) { var t = dayParts(iso); return MONTHS[t.m - 1] + ' ' + t.y; }
+  function weekdayName(iso) {
+    var t = dayParts(iso);
+    return DAYS_LONG[(new Date(Date.UTC(t.y, t.m - 1, t.d)).getUTCDay() + 6) % 7];
+  }
+  function fmtRange(a, b) {
+    if (a.slice(0, 10) === b.slice(0, 10)) return fmtDay(a);
+    var x = dayParts(a), y = dayParts(b);
+    return (x.y === y.y ? fmtDayShort(a) : fmtDay(a)) + ' to ' + fmtDay(b);
+  }
+  function fmtHour(h) { return (h < 10 ? '0' : '') + h + ':00'; }
+  function fmtDuration(seconds) {
+    if (seconds >= 2 * 86400) return count(Math.floor(seconds / 86400), 'day', 'days');
+    if (seconds >= 3600) return count(Math.floor(seconds / 3600), 'hour', 'hours');
+    if (seconds >= 60) return count(Math.floor(seconds / 60), 'minute', 'minutes');
+    return count(seconds, 'second', 'seconds');
+  }
+
+  // ---------------------------------------------------------------- tooltip
+
+  var tip = byId('tooltip');
+
+  function showTip(children, clientX, clientY) {
+    tip.textContent = '';
+    append(tip, children);
+    tip.hidden = false;
+    var box = tip.getBoundingClientRect();
+    var left = Math.max(8, Math.min(clientX - box.width / 2, window.innerWidth - box.width - 8));
+    var top = clientY - box.height - 14;
+    if (top < 8) top = clientY + 18;
+    tip.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
+  }
+
+  function hideTip() { tip.hidden = true; }
+
+  // ---------------------------------------------------------------- count-up
+
+  function countUp(node) {
+    var target = +node.getAttribute('data-count');
+    var prefix = node.getAttribute('data-prefix') || '';
+    var render = function (value) { node.textContent = prefix + fmtNum(value); };
+    render(target);
+    if (reduceMotion || target === 0) return;
+    // Reserve the final width so the sentence does not reflow while counting.
+    node.style.minWidth = node.getBoundingClientRect().width + 'px';
+    var duration = 1500, started = null;
+    render(0);
+    function tick(now) {
+      if (started === null) started = now;
+      var p = Math.min(1, (now - started) / duration);
+      render(Math.round(target * (1 - Math.pow(1 - p, 4))));
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function num(value, prefix) {
+    return el('span', { 'class': 'num gradient-text', 'data-count': value, 'data-prefix': prefix });
+  }
+
+  // ---------------------------------------------------------------- hero
+
+  function renderHero() {
+    var s = DATA.summary;
+    byId('repo-name').textContent = DATA.repo_name;
+
+    append(byId('hero-lede'), [
+      'It began on ', el('span', { 'class': 'date', text: fmtDay(s.first_commit) }), '. ',
+      num(s.age_days), ' ' + plural(s.age_days, 'day', 'days') + ', ',
+      num(s.commits), ' ' + plural(s.commits, 'commit', 'commits') + ' and ',
+      num(s.contributors), ' ' + plural(s.contributors, 'contributor', 'contributors') + ' later, ',
+      'the latest commit landed on ', el('span', { 'class': 'date', text: fmtDay(s.last_commit) }), '.'
+    ]);
+
+    var diff = byId('hero-diffstat');
+    append(diff, el('span', null, [
+      el('strong', { 'data-count': s.lines_added, 'data-prefix': '+' }),
+      ' ' + plural(s.lines_added, 'line', 'lines') + ' added'
+    ]));
+    if (s.lines_added + s.lines_removed > 0) {
+      append(diff, el('span', { 'class': 'diffbar', 'aria-hidden': 'true' }, [
+        el('i', { 'class': 'is-added', style: 'flex:' + s.lines_added }),
+        el('i', { 'class': 'is-removed', style: 'flex:' + s.lines_removed })
+      ]));
+    }
+    append(diff, el('span', null, [
+      el('strong', { 'data-count': s.lines_removed, 'data-prefix': '−' }),
+      ' ' + plural(s.lines_removed, 'line', 'lines') + ' removed'
+    ]));
+
+    var filters = (DATA.meta && DATA.meta.filters) || {};
+    var active = ['since', 'until', 'author'].filter(function (key) { return filters[key]; });
+    if (active.length) {
+      var note = byId('hero-filters');
+      note.hidden = false;
+      note.textContent = 'Showing only commits matching ' + active.map(function (key) {
+        return key + ' "' + filters[key] + '"';
+      }).join(', ') + '.';
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('.hero [data-count]'), countUp);
+  }
+
+  // ---------------------------------------------------------------- timeline
+
+  function niceTicks(max, target) {
+    var rough = Math.max(1, max / target);
+    var pow = Math.pow(10, Math.floor(Math.log(rough) / Math.LN10));
+    var step = [1, 2, 5, 10].map(function (m) { return m * pow; })
+      .filter(function (v) { return v >= rough; })[0] || 10 * pow;
+    step = Math.max(1, Math.round(step));
+    var ticks = [];
+    for (var v = 0; v < max + step; v += step) ticks.push(v);
+    return ticks;
+  }
+
+  function renderTimeline() {
+    var weeks = DATA.timeline;
+    var host = byId('timeline-chart');
+    var n = weeks.length;
+    var bars = n <= 26;
+    var maxCommits = Math.max.apply(null, weeks.map(function (w) { return w.commits; }).concat([1]));
+    var state = { progress: reduceMotion ? 1 : 0, active: -1, geom: null, animating: false };
+
+    var busiest = weeks.reduce(function (best, w) { return w.commits > best.commits ? w : best; }, weeks[0]);
+    byId('timeline-lede').textContent = n === 1
+      ? 'Every commit so far landed in the week of ' + fmtDay(weeks[0].start) + '.'
+      : 'Commits per week across ' + count(n, 'week', 'weeks') + '. The busiest began on ' +
+        fmtDay(busiest.start) + ', with ' + count(busiest.commits, 'commit', 'commits') + '.';
+
+    function draw() {
+      var width = Math.max(260, Math.floor(host.clientWidth));
+      var height = width < 520 ? 220 : 300;
+      var m = { t: 14, r: 14, b: 30, l: 38 };
+      var iw = width - m.l - m.r, ih = height - m.t - m.b;
+      var ticks = niceTicks(maxCommits, width < 520 ? 3 : 4);
+      var top = ticks[ticks.length - 1];
+      var band = iw / n;
+      var x = bars
+        ? function (i) { return m.l + band * (i + 0.5); }
+        : function (i) { return m.l + iw * i / (n - 1); };
+      var y = function (v) { return m.t + ih * (1 - v / top); };
+
+      var defs = svg('defs', null, [
+        svg('linearGradient', { id: 'tl-stroke', gradientUnits: 'userSpaceOnUse', x1: m.l, y1: 0, x2: width - m.r, y2: 0 }, [
+          svg('stop', { offset: '0', 'class': 'stop-a' }), svg('stop', { offset: '1', 'class': 'stop-b' })
+        ]),
+        svg('linearGradient', { id: 'tl-fill', gradientUnits: 'userSpaceOnUse', x1: 0, y1: m.t, x2: 0, y2: m.t + ih }, [
+          svg('stop', { offset: '0', 'class': 'stop-b', 'stop-opacity': '0.34' }),
+          svg('stop', { offset: '1', 'class': 'stop-a', 'stop-opacity': '0.02' })
+        ]),
+        svg('clipPath', { id: 'tl-clip' }, svg('rect', { x: 0, y: 0, width: width * state.progress, height: height }))
+      ]);
+
+      var axes = svg('g', { 'aria-hidden': 'true' });
+      ticks.forEach(function (t) {
+        append(axes, [
+          svg('line', { 'class': 'tl-grid', x1: m.l, x2: width - m.r, y1: y(t), y2: y(t) }),
+          svg('text', { 'class': 'tl-label', x: m.l - 8, y: y(t) + 4, 'text-anchor': 'end', text: fmtNum(t) })
+        ]);
+      });
+      var maxLabels = Math.max(2, Math.floor(iw / 96));
+      var every = Math.ceil(n / maxLabels);
+      for (var i = 0; i < n; i += every) {
+        var lx = x(i);
+        var anchor = lx < m.l + 30 ? 'start' : (lx > width - m.r - 30 ? 'end' : 'middle');
+        append(axes, svg('text', {
+          'class': 'tl-label', x: anchor === 'start' ? m.l : lx, y: height - 8, 'text-anchor': anchor,
+          text: n > 20 ? fmtMonth(weeks[i].start) : fmtDayShort(weeks[i].start)
+        }));
+      }
+
+      var marks = svg('g', { 'clip-path': 'url(#tl-clip)', 'class': bars ? 'tl-bars' : 'tl-area' });
+      var barNodes = [];
+      if (bars) {
+        var bw = Math.max(2, Math.min(34, band - 2));
+        weeks.forEach(function (w, i) {
+          if (!w.commits) { barNodes.push(null); return; }
+          var x0 = x(i) - bw / 2, y0 = y(0), y1 = y(w.commits);
+          var r = Math.min(4, bw / 2, y0 - y1);
+          var bar = svg('path', {
+            'class': 'tl-bar', fill: 'url(#tl-stroke)',
+            d: 'M' + x0 + ',' + y0 + 'V' + (y1 + r) + 'Q' + x0 + ',' + y1 + ' ' + (x0 + r) + ',' + y1 +
+               'H' + (x0 + bw - r) + 'Q' + (x0 + bw) + ',' + y1 + ' ' + (x0 + bw) + ',' + (y1 + r) + 'V' + y0 + 'Z'
+          });
+          barNodes.push(bar);
+          append(marks, bar);
+        });
+      } else {
+        var line = weeks.map(function (w, i) {
+          return (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(w.commits).toFixed(1);
+        }).join('');
+        append(marks, [
+          svg('path', { fill: 'url(#tl-fill)', d: line + 'L' + x(n - 1) + ',' + y(0) + 'L' + x(0) + ',' + y(0) + 'Z' }),
+          svg('path', { 'class': 'tl-line', stroke: 'url(#tl-stroke)', d: line })
+        ]);
+      }
+
+      var guide = svg('line', { 'class': 'tl-guide', y1: m.t, y2: y(0), visibility: 'hidden' });
+      var dot = svg('circle', { 'class': 'tl-dot', r: 5, visibility: 'hidden' });
+      var hit = svg('rect', { x: m.l, y: 0, width: iw, height: height - m.b + 4, fill: 'transparent' });
+
+      var chart = svg('svg', {
+        viewBox: '0 0 ' + width + ' ' + height, width: width, height: height, role: 'img', tabindex: '0',
+        'aria-label': 'Commits per week from ' + fmtDay(weeks[0].start) + ' to ' + fmtDay(weeks[n - 1].start) +
+          '. Peak of ' + count(busiest.commits, 'commit', 'commits') + ' in the week of ' + fmtDay(busiest.start) +
+          '. Use the left and right arrow keys to read each week.'
+      }, [defs, axes, marks, guide, dot, hit]);
+
+      state.geom = { x: x, y: y, m: m, iw: iw, band: band, chart: chart, guide: guide, dot: dot, marks: marks, barNodes: barNodes };
+
+      hit.addEventListener('pointermove', onPointer);
+      hit.addEventListener('pointerdown', onPointer);
+      hit.addEventListener('pointerleave', function () { setActive(-1); });
+      chart.addEventListener('keydown', onKey);
+      chart.addEventListener('focus', function () { if (state.active < 0) setActive(n - 1); });
+      chart.addEventListener('blur', function () { setActive(-1); });
+
+      host.textContent = '';
+      host.appendChild(chart);
+      if (state.active >= 0) setActive(state.active);
+    }
+
+    function onPointer(event) {
+      var g = state.geom;
+      var box = g.chart.getBoundingClientRect();
+      var px = (event.clientX - box.left) * (g.chart.viewBox.baseVal.width / box.width) - g.m.l;
+      var i = bars ? Math.floor(px / g.band) : Math.round(px / g.iw * (n - 1));
+      setActive(Math.max(0, Math.min(n - 1, i)));
+    }
+
+    function onKey(event) {
+      var next = state.active;
+      if (event.key === 'ArrowLeft') next -= 1;
+      else if (event.key === 'ArrowRight') next += 1;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = n - 1;
+      else if (event.key === 'Escape') { setActive(-1); return; }
+      else return;
+      event.preventDefault();
+      setActive(Math.max(0, Math.min(n - 1, next)));
+    }
+
+    function setActive(i) {
+      var g = state.geom;
+      if (!g) return;
+      if (state.active >= 0 && g.barNodes[state.active]) g.barNodes[state.active].classList.remove('is-active');
+      state.active = i;
+      if (i < 0) {
+        g.guide.setAttribute('visibility', 'hidden');
+        g.dot.setAttribute('visibility', 'hidden');
+        g.marks.classList.remove('has-active');
+        hideTip();
+        return;
+      }
+      var week = weeks[i], cx = g.x(i), cy = g.y(week.commits);
+      if (bars) {
+        g.marks.classList.add('has-active');
+        if (g.barNodes[i]) g.barNodes[i].classList.add('is-active');
+      } else {
+        setAttrs(g.guide, { x1: cx, x2: cx, visibility: 'visible' });
+        setAttrs(g.dot, { cx: cx, cy: cy, visibility: 'visible' });
+      }
+      var box = g.chart.getBoundingClientRect();
+      var scale = box.width / g.chart.viewBox.baseVal.width;
+      showTip([
+        el('strong', { text: count(week.commits, 'commit', 'commits') }),
+        'Week of ' + fmtDay(week.start),
+        week.top_message ? el('em', { text: '“' + week.top_message + '”' }) : null
+      ], box.left + cx * scale, box.top + cy * scale);
+    }
+
+    function start() {
+      if (state.progress >= 1 || state.animating) return;
+      state.animating = true;
+      var duration = 1700, began = null;
+      function tick(now) {
+        if (began === null) began = now;
+        var p = Math.min(1, (now - began) / duration);
+        state.progress = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+        var clip = document.querySelector('#tl-clip rect');
+        if (clip && state.geom) clip.setAttribute('width', state.geom.chart.viewBox.baseVal.width * state.progress);
+        if (p < 1) requestAnimationFrame(tick);
+        else { state.progress = 1; state.animating = false; }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    draw();
+    var pending = false, lastWidth = host.clientWidth;
+    function redraw() {
+      if (pending || host.clientWidth === lastWidth) return;
+      pending = true;
+      requestAnimationFrame(function () { pending = false; lastWidth = host.clientWidth; hideTip(); draw(); });
+    }
+    if (window.ResizeObserver) new ResizeObserver(redraw).observe(host);
+    else window.addEventListener('resize', redraw);
+
+    return start;
+  }
+
+  // ---------------------------------------------------------------- contributors
+
+  function sparkline(values) {
+    var w = 240, h = 38, pad = 3, n = values.length;
+    var max = Math.max.apply(null, values.concat([1]));
+    var x = function (i) { return n === 1 ? w / 2 : i / (n - 1) * w; };
+    var y = function (v) { return h - pad - v / max * (h - pad * 2); };
+    var line = values.map(function (v, i) { return (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join('');
+    return svg('svg', { 'class': 'spark', viewBox: '0 0 ' + w + ' ' + h, preserveAspectRatio: 'none', 'aria-hidden': 'true' }, [
+      svg('path', { 'class': 'spark-area', d: line + 'L' + w + ',' + h + 'L0,' + h + 'Z' }),
+      svg('path', { 'class': 'spark-line', d: line })
+    ]);
+  }
+
+  function diffText(added, removed) {
+    return [
+      el('i', { 'class': 'swatch is-added', 'aria-hidden': 'true' }), '+' + fmtNum(added),
+      el('i', { 'class': 'swatch is-removed', 'aria-hidden': 'true' }), '−' + fmtNum(removed)
+    ];
+  }
+
+  function renderContributors() {
+    var people = DATA.contributors, total = DATA.summary.contributors, commits = DATA.summary.commits;
+    var lead = people[0];
+    byId('contributors-lede').textContent = total === 1
+      ? lead.name + ' wrote every commit.'
+      : fmtNum(total) + ' people have committed. ' + lead.name + ' leads with ' +
+        count(lead.commits, 'commit', 'commits') + ' (' + Math.round(lead.commits / commits * 100) + '% of the total).';
+
+    var list = byId('people'), initial = 6;
+    people.forEach(function (p, i) {
+      var card = el('li', { 'class': 'person' }, [
+        el('div', { 'class': 'person-head' }, [
+          el('span', { 'class': 'avatar', style: 'background:' + p.color, 'aria-hidden': 'true', text: p.initials }),
+          el('span', { 'class': 'person-name', title: p.name, text: p.name }),
+          el('span', { 'class': 'person-rank', text: '#' + (i + 1) })
+        ]),
+        el('div', { 'class': 'person-stats' }, [
+          el('span', { 'class': 'person-commits' }, [fmtNum(p.commits), el('small', { text: plural(p.commits, 'commit', 'commits') })]),
+          el('span', { 'class': 'person-lines' }, diffText(p.lines_added, p.lines_removed))
+        ]),
+        sparkline(p.sparkline),
+        el('div', { 'class': 'person-dates', text: 'Active ' + fmtRange(p.first_active, p.last_active) })
+      ]);
+      if (i >= initial) card.hidden = true;
+      list.appendChild(card);
+    });
+
+    var more = byId('people-more');
+    var notShown = total - people.length;
+    var tail = notShown > 0 ? 'Plus ' + count(notShown, 'more contributor', 'more contributors') + ' not listed here.' : '';
+    if (people.length > initial) {
+      var button = el('button', { type: 'button', text: 'Show all ' + people.length + ' contributors' });
+      button.addEventListener('click', function () {
+        Array.prototype.forEach.call(list.children, function (card) { card.hidden = false; });
+        more.textContent = tail;
+      });
+      more.appendChild(button);
+    } else {
+      more.textContent = tail;
+    }
+  }
+
+  // ---------------------------------------------------------------- heatmap
+
+  function heat(value, max) { return value ? (0.16 + 0.84 * Math.sqrt(value / max)).toFixed(3) : 0; }
+
+  function renderHeatmap() {
+    var grid = DATA.heatmap, host = byId('heatmap');
+    var max = 1, peak = { day: 0, hour: 0, count: 0 };
+    grid.forEach(function (row, d) {
+      row.forEach(function (v, h) {
+        if (v > max) max = v;
+        if (v > peak.count) peak = { day: d, hour: h, count: v };
+      });
+    });
+
+    byId('rhythm-lede').textContent = 'Each square is one hour of the week, in the local time of whoever made the commit.';
+
+    host.setAttribute('role', 'img');
+    host.setAttribute('aria-label', 'Heatmap of commits by day of week and hour. Busiest hour: ' +
+      DAYS_LONG[peak.day] + 's at ' + fmtHour(peak.hour) + ' with ' + count(peak.count, 'commit', 'commits') + '.');
+
+    host.appendChild(el('span'));
+    for (var h = 0; h < 24; h++) host.appendChild(el('span', { 'class': 'hm-hour', text: h % 3 === 0 ? h : '' }));
+    grid.forEach(function (row, d) {
+      host.appendChild(el('span', { 'class': 'hm-day', text: DAYS[d] }));
+      row.forEach(function (v, hour) {
+        host.appendChild(el('i', {
+          'class': 'hm-cell', style: '--v:' + heat(v, max) + ';--col:' + hour,
+          'data-day': d, 'data-hour': hour, 'data-count': v
+        }));
+      });
+    });
+
+    function onMove(event) {
+      var cell = event.target.closest ? event.target.closest('.hm-cell') : null;
+      if (!cell) { hideTip(); return; }
+      var hour = +cell.getAttribute('data-hour'), n = +cell.getAttribute('data-count');
+      var box = cell.getBoundingClientRect();
+      showTip([
+        el('strong', { text: count(n, 'commit', 'commits') }),
+        DAYS_LONG[+cell.getAttribute('data-day')] + 's, ' + fmtHour(hour) + ' to ' + fmtHour((hour + 1) % 24)
+      ], box.left + box.width / 2, box.top);
+    }
+    host.addEventListener('pointermove', onMove);
+    host.addEventListener('pointerdown', onMove);
+    host.addEventListener('pointerleave', hideTip);
+
+    var legend = byId('heatmap-legend');
+    legend.appendChild(el('span', { text: 'Fewer' }));
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (step) {
+      legend.appendChild(el('i', { 'class': 'hm-cell', style: '--v:' + heat(step * max, max) }));
+    });
+    legend.appendChild(el('span', { text: 'More commits' }));
+
+    var persona = DATA.persona;
+    append(byId('persona'), [
+      el('div', { 'class': 'persona-emoji', 'aria-hidden': 'true', text: persona.emoji }),
+      el('div', { 'class': 'persona-label', text: persona.label }),
+      el('p', { 'class': 'persona-text', text: persona.description }),
+      el('p', { 'class': 'persona-peak', text: 'Busiest hour of the week: ' + DAYS_LONG[peak.day] + 's at ' +
+        fmtHour(peak.hour) + ' (' + count(peak.count, 'commit', 'commits') + ').' })
+    ]);
+  }
+
+  // ---------------------------------------------------------------- bar lists
+
+  // `fill` is a list of coloured segments, or null for a single solid bar.
+  // `title` marks the label as a file path: monospace, full path on hover.
+  function barRow(index, label, value, widthPct, fill, title) {
+    return el('li', { 'class': 'bar-row' }, [
+      el('div', { 'class': 'bar-head' }, [
+        el('div', { 'class': 'bar-label' + (title ? ' mono' : ''), title: title }, label),
+        el('div', { 'class': 'bar-value' }, value)
+      ]),
+      el('div', { 'class': 'bar-track' }, el('div', {
+        'class': 'bar-fill' + (fill ? '' : ' is-solid'), style: '--w:' + widthPct.toFixed(2) + '%;--i:' + index
+      }, fill))
+    ]);
+  }
+
+  function renderChurn() {
+    var files = DATA.files, extensions = DATA.extensions;
+    var fileList = byId('churn-files'), extList = byId('churn-extensions');
+    byId('churn-lede').textContent = 'The files that changed the most, by lines added and removed. Renamed files keep their history.';
+
+    if (!files.length) {
+      byId('churn-legend').hidden = true;
+      fileList.appendChild(el('li', { 'class': 'empty', text: 'No file changes were recorded for these commits.' }));
+    } else {
+      append(byId('churn-legend'), [
+        el('span', null, [el('i', { 'class': 'swatch is-added' }), 'Lines added']),
+        el('span', null, [el('i', { 'class': 'swatch is-removed' }), 'Lines removed'])
+      ]);
+      var maxLines = Math.max.apply(null, files.map(function (f) { return f.lines_added + f.lines_removed; }).concat([1]));
+      files.forEach(function (f, i) {
+        var slash = f.path.lastIndexOf('/');
+        var total = f.lines_added + f.lines_removed;
+        fileList.appendChild(barRow(i, [
+          slash >= 0 ? el('span', { 'class': 'path-dir', text: f.path.slice(0, slash + 1) }) : null,
+          el('span', { 'class': 'path-name', text: f.path.slice(slash + 1) })
+        ], [
+          '+' + fmtNum(f.lines_added) + ' −' + fmtNum(f.lines_removed),
+          el('small', { text: count(f.commits, 'commit', 'commits') })
+        ], total / maxLines * 100, [
+          f.lines_added ? el('i', { 'class': 'is-added', style: 'flex:' + f.lines_added }) : null,
+          f.lines_removed ? el('i', { 'class': 'is-removed', style: 'flex:' + f.lines_removed }) : null
+        ], f.path));
+      });
+    }
+
+    if (!extensions.length) {
+      extList.appendChild(el('li', { 'class': 'empty', text: 'Nothing to show yet.' }));
+    } else {
+      var maxShare = Math.max.apply(null, extensions.map(function (e) { return e.share; }).concat([0.0001]));
+      extensions.forEach(function (e, i) {
+        var named = e.language !== e.extension;
+        extList.appendChild(barRow(i, [
+          el('span', { 'class': 'path-name', text: e.language }),
+          named ? el('span', { 'class': 'hint mono', text: e.extension }) : null
+        ], [
+          Math.round(e.share * 100) + '%',
+          el('small', { text: count(e.lines_changed, 'line', 'lines') })
+        ], e.share / maxShare * 100, null));
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- messages
+
+  function tile(value, unit, label, extra) {
+    return el('div', { 'class': 'tile' }, [
+      el('div', { 'class': 'tile-value' }, [value, unit ? el('small', { text: unit }) : null]),
+      el('div', { 'class': 'tile-label', text: label }),
+      extra
+    ]);
+  }
+
+  function quote(kind, ref) {
+    return el('figure', { 'class': 'quote', style: 'margin:0' }, [
+      el('div', { 'class': 'quote-kind', text: kind + ', ' + count(ref.length, 'character', 'characters') }),
+      el('blockquote', { 'class': 'quote-text', style: 'margin-left:0;margin-right:0', text: ref.text || '(empty message)' }),
+      el('figcaption', { 'class': 'quote-meta' }, [ref.author + ', ' + fmtDay(ref.when) + ', ', el('span', { 'class': 'mono', text: ref.hash })])
+    ]);
+  }
+
+  function renderMessages() {
+    var m = DATA.messages, merges = DATA.summary.merges;
+    byId('messages-lede').textContent = 'Based on the subject line of ' + count(m.analysed, 'commit', 'commits') +
+      (merges && m.analysed < DATA.summary.commits ? ' (' + count(merges, 'merge commit', 'merge commits') + ' left out).' : '.');
+
+    var chips = m.conventional_types.length ? el('div', { 'class': 'chips' }, m.conventional_types.map(function (t) {
+      return el('span', { 'class': 'chip' }, [t.type, el('b', { text: fmtNum(t.count) })]);
+    })) : null;
+    append(byId('message-tiles'), [
+      tile(fmtNum(m.average_length), 'characters', 'Average message length'),
+      tile(fmtNum(m.average_words), 'words', 'Average words per message'),
+      tile(Math.round(m.conventional_share * 100) + '%', null,
+        'Use a conventional-commit prefix (' + fmtNum(m.conventional_count) + ' of ' + fmtNum(m.analysed) + ')', chips)
+    ]);
+
+    var words = byId('message-words');
+    if (!m.common_words.length) {
+      words.appendChild(el('li', { 'class': 'empty', text: 'Not enough words to count yet.' }));
+    } else {
+      var maxCount = m.common_words[0].count;
+      words.className = 'bars is-two-col';
+      words.style.setProperty('--rows', Math.ceil(m.common_words.length / 2));
+      m.common_words.forEach(function (w, i) {
+        words.appendChild(barRow(i, el('span', { 'class': 'path-name', text: w.word }),
+          fmtNum(w.count), w.count / maxCount * 100, null));
+      });
+    }
+
+    var quotes = byId('message-quotes');
+    if (m.longest) quotes.appendChild(quote('Longest message', m.longest));
+    if (m.shortest) quotes.appendChild(quote('Shortest message', m.shortest));
+  }
+
+  // ---------------------------------------------------------------- fun facts
+
+  function fact(emoji, title, value, detail) {
+    return el('div', { 'class': 'fact' }, [
+      el('div', { 'class': 'fact-emoji', 'aria-hidden': 'true', text: emoji }),
+      el('div', { 'class': 'fact-title', text: title }),
+      el('div', { 'class': 'fact-value', text: value }),
+      el('div', { 'class': 'fact-detail' }, detail)
+    ]);
+  }
+
+  function renderFacts() {
+    var f = DATA.facts, cards = byId('fact-cards');
+    var big = f.biggest_commit;
+    if (big) {
+      cards.appendChild(fact('💥', 'Biggest single commit',
+        count(big.lines_added + big.lines_removed, 'line', 'lines'), [
+          el('q', { text: big.subject || '(empty message)' }),
+          ' by ' + big.author + ' on ' + fmtDay(big.when) + ', touching ' + count(big.files, 'file', 'files') + ' (',
+          el('span', { 'class': 'mono', text: big.hash }), ').'
+        ]));
+    }
+    var streak = f.longest_streak;
+    cards.appendChild(fact('🔥', 'Longest streak', count(streak.days, 'day', 'days'),
+      streak.days === 1
+        ? 'No two days in a row with commits yet.'
+        : 'A commit every day from ' + fmtRange(streak.start, streak.end) + '.'));
+    var gap = f.longest_gap;
+    cards.appendChild(fact('🏖️', 'Longest gap',
+      gap ? fmtDuration(gap.seconds) : 'None yet',
+      gap ? 'Nothing was committed from ' + fmtRange(gap.start, gap.end) + '.' : 'A gap needs at least two commits.'));
+    var busy = f.busiest_day;
+    cards.appendChild(fact('📅', 'Busiest day ever', count(busy.commits, 'commit', 'commits'),
+      weekdayName(busy.day) + ', ' + fmtDay(busy.day) + '.'));
+  }
+
+  // ---------------------------------------------------------------- page chrome
+
+  function renderFooter() {
+    var meta = DATA.meta || {};
+    byId('footer-meta').textContent = (meta.version ? ' ' + meta.version : '') +
+      (meta.generated_at ? ' on ' + fmtDay(meta.generated_at) : '') + '.';
+  }
+
+  function setupTheme() {
+    var button = byId('theme-toggle');
+    function label() { button.textContent = root.getAttribute('data-theme') === 'dark' ? 'Light theme' : 'Dark theme'; }
+    button.addEventListener('click', function () {
+      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      label();
+    });
+    label();
+  }
+
+  function setupReveal(hooks) {
+    var sections = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+    function show(section) {
+      section.classList.add('is-visible');
+      if (hooks[section.id]) hooks[section.id]();
+    }
+    if (reduceMotion || !('IntersectionObserver' in window)) { sections.forEach(show); return; }
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        observer.unobserve(entry.target);
+        show(entry.target);
+      });
+    }, { threshold: 0.06, rootMargin: '0px 0px -6% 0px' });
+    sections.forEach(function (section) { observer.observe(section); });
+  }
+
+  setupTheme();
+  renderHero();
+  var startTimeline = renderTimeline();
+  renderContributors();
+  renderHeatmap();
+  renderChurn();
+  renderMessages();
+  renderFacts();
+  renderFooter();
+  setupReveal({ timeline: startTimeline });
+  window.addEventListener('scroll', hideTip, { passive: true });
+})();
+
+</script>
+</body>
+</html>
