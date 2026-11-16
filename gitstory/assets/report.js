@@ -631,7 +631,10 @@
     var gap = f.longest_gap;
     cards.appendChild(fact('🏖️', 'Longest gap',
       gap ? fmtDuration(gap.seconds) : 'None yet',
-      gap ? 'Nothing was committed from ' + fmtRange(gap.start, gap.end) + '.' : 'A gap needs at least two commits.'));
+      !gap ? 'A gap needs at least two commits.'
+        : gap.start.slice(0, 10) === gap.end.slice(0, 10)
+          ? 'The longest wait between two commits, on ' + fmtDay(gap.start) + '.'
+          : 'Nothing was committed from ' + fmtRange(gap.start, gap.end) + '.'));
     var busy = f.busiest_day;
     cards.appendChild(fact('📅', 'Busiest day ever', count(busy.commits, 'commit', 'commits'),
       weekdayName(busy.day) + ', ' + fmtDay(busy.day) + '.'));
