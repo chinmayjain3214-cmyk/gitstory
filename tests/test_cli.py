@@ -70,7 +70,7 @@ def test_cli_writes_a_report(repo: Path, tmp_path: Path, capsys):
 def test_cli_filters_are_passed_to_git(repo: Path, tmp_path: Path, capsys):
     output = tmp_path / "report.html"
     assert cli.main([str(repo), "-o", str(output), "--until", "2024-03-04T23:00:00+02:00"]) == 0
-    assert "1 commits" in capsys.readouterr().out
+    assert "1 commit," in capsys.readouterr().out
     assert cli.main([str(repo), "-o", str(output), "--author", "nobody-by-this-name"]) == 1
     assert "no commits match" in capsys.readouterr().err
 

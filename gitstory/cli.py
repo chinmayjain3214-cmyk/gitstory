@@ -52,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _count(number: int, noun: str) -> str:
+    """``1 commit``, ``2 commits``, ``1,234 commits``."""
+    return f"{number:,} {noun}" + ("" if number == 1 else "s")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Entry point for the ``gitstory`` console script. Returns the exit code."""
     args = build_parser().parse_args(argv)
@@ -74,8 +79,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     summary = report.summary
     # Plain ASCII on purpose: legacy Windows consoles cannot print much else.
     print(
-        f"Wrote {output} ({summary.commits:,} commits, "
-        f"{summary.contributors:,} contributors, {summary.age_days:,} days of history)"
+        f"Wrote {output} ({_count(summary.commits, 'commit')}, "
+        f"{_count(summary.contributors, 'contributor')}, {_count(summary.age_days, 'day')} of history)"
     )
     if args.open_report:
         webbrowser.open(Path(output).resolve().as_uri())
