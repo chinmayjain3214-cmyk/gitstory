@@ -153,6 +153,38 @@ ol, ul { padding: 0; list-style: none; }
 }
 .theme-toggle:hover { color: var(--ink); border-color: var(--muted); }
 
+.report-nav {
+  position: absolute;
+  top: 18px;
+  left: var(--gutter);
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.report-nav[hidden] { display: none; }
+.report-nav a {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+.report-nav a:hover { color: var(--ink); border-color: var(--muted); }
+.report-nav a:first-child { color: var(--ink); }
+
+.hero-source {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+.hero-source:hover { color: var(--accent); }
+
 /* ---------- Hero ---------- */
 
 .hero { padding: clamp(5rem, 15vh, 9rem) 0 clamp(3rem, 8vh, 5rem); }
@@ -522,6 +554,369 @@ ol, ul { padding: 0; list-style: none; }
 
 .noscript { max-width: 40rem; margin: 2rem auto; padding: 0 1.5rem; color: var(--ink-2); }
 
+/* ---------- Commit history ---------- */
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.history-start { margin-top: 1.5rem; }
+
+.history-open {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: min(100%, 520px);
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(120deg, var(--accent-a), var(--accent-b) 40%, var(--line) 75%) border-box;
+  border-color: transparent;
+  box-shadow: var(--shadow), 0 0 0 0 var(--glow);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+}
+.history-open:hover { transform: translateY(-2px); box-shadow: var(--shadow), 0 0 0 6px var(--glow); }
+.history-open:active { transform: translateY(0); }
+.history-open-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+}
+.history-open-icon svg { fill: none; stroke: #1a0d05; stroke-width: 1.9; stroke-linecap: round; }
+.history-open-icon circle { fill: #1a0d05; stroke: none; }
+.history-open-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.history-open-text strong { font-size: 1.125rem; font-weight: 650; }
+.history-open-text small { color: var(--muted); font-size: 0.875rem; }
+.history-open-arrow { flex: none; color: var(--accent); font-size: 1.375rem; transition: transform 0.2s ease; }
+.history-open:hover .history-open-arrow { transform: translateX(4px); }
+
+.history-browser { margin-top: 1.5rem; }
+.history-browser.is-entering { animation: commit-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+.history-tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.history-search {
+  flex: 1 1 280px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.history-search::placeholder { color: var(--muted); }
+.history-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--glow); }
+
+.history-types { display: flex; flex-wrap: wrap; gap: 6px; }
+.type-filter {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.type-filter b { margin-left: 5px; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.type-filter:hover { border-color: var(--muted); color: var(--ink); }
+.type-filter[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.type-filter[aria-pressed="true"] b { color: inherit; opacity: 0.7; }
+
+.history-file-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px dashed rgba(255, 143, 61, 0.45);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  animation: commit-in 0.35s ease both;
+}
+.history-file-filter[hidden] { display: none; }
+.history-file-filter .mono { color: var(--ink); overflow-wrap: anywhere; }
+.history-file-filter button {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.history-status { margin-top: 14px; color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+
+/* The list draws its own little commit graph: a line with a dot per commit. */
+.commits { position: relative; display: grid; gap: 12px; margin-top: 12px; padding-left: 26px; outline: none; }
+.commits::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 22px;
+  bottom: 22px;
+  width: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to bottom, var(--accent), var(--line));
+}
+.commits:empty::before { display: none; }
+
+.commit { position: relative; min-width: 0; }
+.commit::before {
+  content: "";
+  position: absolute;
+  left: -24px;
+  top: 24px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.commit.is-merge::before { border-radius: 3px; transform: rotate(45deg) scale(0.9); border-color: var(--muted); }
+.commit.is-open::before { background: var(--accent); box-shadow: 0 0 0 4px var(--glow); }
+
+.commit-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: border-color 0.2s;
+}
+.commit.is-open .commit-card { border-color: rgba(255, 143, 61, 0.38); }
+
+.commit-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.commit-head:hover .commit-subject-text { color: var(--accent); }
+.avatar.is-small { width: 36px; height: 36px; font-size: 0.8125rem; }
+
+.commit-main { min-width: 0; }
+.commit-subject { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-weight: 600; }
+.commit-subject-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.15s; }
+.commit.is-open .commit-subject-text { white-space: normal; overflow-wrap: anywhere; }
+.commit-meta { margin-top: 2px; color: var(--muted); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.type-tag {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.type-tag.t-feat { background: rgba(42, 173, 128, 0.16); color: var(--added); }
+.type-tag.t-fix { background: rgba(207, 53, 80, 0.15); color: var(--removed); }
+[data-theme="dark"] .type-tag.t-fix { color: #ff7d93; }
+.type-tag.t-merge { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+
+.commit-side { display: grid; justify-items: end; gap: 5px; font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.commit-diff { color: var(--ink-2); white-space: nowrap; }
+.commit-diff .add { color: var(--added); }
+.commit-diff .del { color: var(--removed); margin-left: 6px; }
+[data-theme="dark"] .commit-diff .del { color: #ff7d93; }
+.commit-side .diffbar { width: 96px; height: 5px; }
+.commit-files { color: var(--muted); white-space: nowrap; }
+.commit-chevron { display: inline-block; margin-left: 6px; transition: transform 0.25s ease; }
+.commit.is-open .commit-chevron { transform: rotate(180deg); }
+
+/* Expanding panel: animating grid rows from 0fr to 1fr gives a smooth height. */
+.commit-details { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.commit.is-open .commit-details { grid-template-rows: 1fr; }
+.commit-details-inner { min-height: 0; overflow: hidden; }
+.commit-details-body { padding: 4px 18px 18px; border-top: 1px solid var(--line); margin: 0 18px; padding-left: 0; padding-right: 0; }
+
+.commit-facts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 14px; }
+.commit-fact {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+}
+.commit-fact.is-milestone { background: var(--glow); color: var(--ink); }
+
+.commit-body {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  background: var(--bg);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.cfiles-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 18px; font-size: 0.875rem; font-weight: 650; }
+.cfiles-title small { color: var(--muted); font-weight: 400; }
+.cfiles { display: grid; gap: 2px; margin-top: 8px; }
+.cfile {
+  display: grid;
+  grid-template-columns: 4.6rem minmax(0, 1fr) 7.5rem 8.75rem;
+  grid-template-areas: "status path lines history" ". bar bar .";
+  gap: 4px 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+.cfile:hover { background: var(--surface-2); }
+.cfile.is-followed { background: var(--glow); box-shadow: inset 3px 0 0 var(--accent); }
+.commit.is-open .cfile { animation: commit-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--j, 0) * 28ms + 120ms); }
+
+.cfile-status {
+  grid-area: status;
+  justify-self: start;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.cfile-status.s-A { background: rgba(42, 173, 128, 0.16); color: var(--added); }
+.cfile-status.s-D { background: rgba(207, 53, 80, 0.15); color: var(--removed); }
+[data-theme="dark"] .cfile-status.s-D { color: #ff7d93; }
+.cfile-status.s-R { background: rgba(255, 184, 61, 0.16); color: var(--accent-b); }
+[data-theme="light"] .cfile-status.s-R { color: var(--accent-b); }
+
+.cfile-path { grid-area: path; display: flex; flex-wrap: wrap; align-items: baseline; min-width: 0; font-family: var(--mono); font-size: 0.8125rem; }
+.cfile-path .path-dir { color: var(--muted); overflow-wrap: anywhere; }
+.cfile-path .path-name { color: var(--ink); overflow-wrap: anywhere; }
+.cfile-path small { flex-basis: 100%; color: var(--muted); font-family: var(--sans); font-size: 0.75rem; overflow-wrap: anywhere; }
+.cfile-lines { grid-area: lines; justify-self: end; color: var(--ink-2); font-size: 0.8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cfile-bar { grid-area: bar; display: flex; gap: 2px; height: 4px; }
+.cfile-bar i { display: block; height: 100%; border-radius: 2px; }
+.cfile-bar .is-added { background: var(--added); }
+.cfile-bar .is-removed { background: var(--removed); }
+.commit.is-open .cfile-bar { transform-origin: left; animation: grow-x 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--j, 0) * 28ms + 220ms); }
+
+.cfile-history {
+  grid-area: history;
+  justify-self: end;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+button.cfile-history:hover { border-color: var(--accent); color: var(--accent); }
+span.cfile-history { cursor: default; border-style: dashed; color: var(--muted); }
+
+.cfiles-more, .cfiles-note { margin-top: 8px; color: var(--muted); font-size: 0.8125rem; }
+
+.commit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.commit-actions button, .commit-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.commit-actions button:hover, .commit-actions a:hover { border-color: var(--muted); color: var(--ink); }
+.commit-actions .mono { color: var(--ink); }
+
+.history-more { display: flex; justify-content: center; margin-top: 18px; }
+.history-more[hidden] { display: none; }
+.history-more-button {
+  padding: 10px 22px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(100deg, var(--accent-a), var(--accent-b));
+  color: #1a0d05;
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.12s;
+}
+.history-more-button:hover { filter: brightness(1.08); }
+.history-more-button:active { transform: translateY(1px); }
+.history-more-button small { margin-left: 6px; font-weight: 500; opacity: 0.75; }
+
+.hash-link {
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px dashed currentColor;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-family: var(--mono);
+  font-size: 0.92em;
+  cursor: pointer;
+}
+.hash-link:hover { color: var(--accent); }
+
+.commit.is-entering { animation: commit-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 55ms); }
+.commit.is-entering::before { animation: dot-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; animation-delay: calc(var(--i, 0) * 55ms + 120ms); }
+.commit.is-entering .commit-side .diffbar { transform-origin: left; animation: grow-x 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 55ms + 200ms); }
+.commit.is-flash .commit-card { animation: flash 1.6s ease; }
+
+@keyframes commit-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes dot-pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes flash { 0%, 100% { box-shadow: var(--shadow); } 25% { box-shadow: var(--shadow), 0 0 0 6px var(--glow); } }
+
 /* ---------- Motion ---------- */
 
 .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
@@ -535,6 +930,8 @@ ol, ul { padding: 0; list-style: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .reveal, .reveal .bar-fill, .reveal .hm-cell::after, .tl-bar { transition: none; }
+  .commit, .commit::before, .commit .diffbar, .cfile, .cfile-bar, .commit-card, .history-browser, .history-file-filter { animation: none !important; }
+  .commit-details, .commit-chevron, .history-open, .history-open-arrow { transition: none; }
   .reveal { opacity: 1; transform: none; }
   .reveal .bar-fill { transform: none; }
   .reveal .hm-cell::after { opacity: var(--v, 0); }
@@ -555,24 +952,37 @@ ol, ul { padding: 0; list-style: none; }
   .hm-cell { border-radius: 2px; }
   .hm-hour, .hm-day { font-size: 0.6875rem; }
   .theme-toggle { top: 12px; right: 12px; }
+  .report-nav { top: 12px; left: 16px; right: 120px; }
   .bar-value small { display: none; }
   .bars.is-two-col { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .commits { padding-left: 20px; }
+  .commits::before { left: 4px; }
+  .commit::before { left: -21px; }
+  .commit-head { grid-template-columns: auto minmax(0, 1fr); padding: 12px 14px; gap: 12px; }
+  .commit-side { grid-column: 2; justify-items: start; grid-auto-flow: column; align-items: center; gap: 10px; }
+  .commit-details-body { margin: 0 14px; }
+  .cfile { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "status lines" "path path" "bar bar" "history history"; padding: 10px 6px; }
+  .cfile-lines { justify-self: end; }
+  .cfile-history { justify-self: start; margin-top: 2px; }
 }
 
 @media print {
   .reveal { opacity: 1 !important; transform: none !important; }
-  .theme-toggle, .tooltip { display: none !important; }
+  .theme-toggle, .tooltip, .report-nav, .history-start, .history-tools, .history-more { display: none !important; }
+  .commit-details { grid-template-rows: 1fr !important; }
 }
 
 </style>
 </head>
 <body>
 <button class="theme-toggle" id="theme-toggle" type="button">Light theme</button>
+<nav class="report-nav" id="report-nav" aria-label="gitstory" hidden></nav>
 
 <main class="story">
   <header class="hero">
     <p class="hero-kicker">The story of</p>
     <h1 class="hero-title" id="repo-name"></h1>
+    <a class="hero-source" id="hero-source" target="_blank" rel="noopener noreferrer" hidden></a>
     <p class="hero-lede" id="hero-lede"></p>
     <div class="hero-diffstat" id="hero-diffstat"></div>
     <p class="hero-filters" id="hero-filters" hidden></p>
@@ -621,6 +1031,37 @@ ol, ul { padding: 0; list-style: none; }
     </div>
   </section>
 
+  <section class="chapter reveal" id="history" aria-labelledby="history-title" hidden>
+    <h2 class="chapter-title" id="history-title">Commit history</h2>
+    <p class="chapter-lede">Every commit, newest first. Open one to see the files it changed and how often each of those files has changed over the life of the project.</p>
+    <div class="history-start" id="history-start">
+      <button class="history-open" id="history-open" type="button" aria-controls="history-browser" aria-expanded="false">
+        <span class="history-open-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="9" r="2.2"/><path d="M6 7.2v9.6M18 11.2c0 3.6-4.5 3.2-10.4 6.6"/></svg>
+        </span>
+        <span class="history-open-text">
+          <strong>Commit history</strong>
+          <small id="history-open-hint"></small>
+        </span>
+        <span class="history-open-arrow" aria-hidden="true">→</span>
+      </button>
+    </div>
+    <div class="history-browser" id="history-browser" hidden>
+      <div class="history-tools">
+        <label class="visually-hidden" for="history-search">Search commits</label>
+        <input class="history-search" id="history-search" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Search messages, authors, hashes or file names">
+        <div class="history-types" id="history-types" role="group" aria-label="Filter by commit type"></div>
+      </div>
+      <div class="history-file-filter" id="history-file-filter" hidden></div>
+      <p class="history-status" id="history-status" role="status" aria-live="polite"></p>
+      <ol class="commits" id="commit-list" tabindex="-1" aria-labelledby="history-title"></ol>
+      <div class="history-more">
+        <button class="history-more-button" id="history-more" type="button">Load 10 more</button>
+      </div>
+    </div>
+  </section>
+
   <section class="chapter reveal" id="messages" aria-labelledby="messages-title">
     <h2 class="chapter-title" id="messages-title">Commit message insights</h2>
     <p class="chapter-lede" id="messages-lede"></p>
@@ -647,7 +1088,7 @@ ol, ul { padding: 0; list-style: none; }
 <div class="tooltip" id="tooltip" role="status" aria-live="polite" hidden></div>
 <noscript><p class="noscript">This report draws its charts with JavaScript. Enable JavaScript to see it.</p></noscript>
 
-<script id="gitstory-data" type="application/json">{"repo_name":"gitstory","summary":{"commits":7,"contributors":1,"merges":0,"files_touched":20,"lines_added":5103,"lines_removed":6,"first_commit":"2026-11-16T18:22:46+00:00","last_commit":"2026-11-16T18:23:16+00:00","age_days":1},"timeline":[{"start":"2026-11-16","commits":7,"lines_added":5103,"lines_removed":6,"top_message":"feat(render): build the self-contained animated HTML report and the CLI"}],"contributors":[{"name":"gitstory-dev","initials":"GD","color":"hsl(20, 58%, 46%)","commits":7,"lines_added":5103,"lines_removed":6,"first_active":"2026-11-16","last_active":"2026-11-16","sparkline":[5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]}],"heatmap":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"persona":{"label":"After-hours hacker","emoji":"🌆","description":"100% of commits land between 6pm and 10pm."},"files":[{"path":"examples/demo-report.html","lines_added":1346,"lines_removed":2,"commits":2},{"path":"gitstory/assets/report.js","lines_added":690,"lines_removed":1,"commits":2},{"path":"gitstory/stats.py","lines_added":660,"lines_removed":0,"commits":1},{"path":"gitstory/assets/report.css","lines_added":556,"lines_removed":0,"commits":1},{"path":"gitstory/parser.py","lines_added":390,"lines_removed":0,"commits":1},{"path":"tests/test_stats.py","lines_added":346,"lines_removed":0,"commits":1},{"path":"README.md","lines_added":203,"lines_removed":0,"commits":1},{"path":"tests/test_parser.py","lines_added":166,"lines_removed":0,"commits":1},{"path":"examples/make_demo_repo.py","lines_added":146,"lines_removed":0,"commits":1},{"path":"tests/test_cli.py","lines_added":107,"lines_removed":1,"commits":2},{"path":"gitstory/render.py","lines_added":104,"lines_removed":0,"commits":1},{"path":"gitstory/assets/template.html","lines_added":99,"lines_removed":0,"commits":1},{"path":"gitstory/cli.py","lines_added":93,"lines_removed":2,"commits":2},{"path":"tests/test_render.py","lines_added":88,"lines_removed":0,"commits":1},{"path":"pyproject.toml","lines_added":43,"lines_removed":0,"commits":1}],"extensions":[{"extension":".py","language":"Python","lines_changed":2120,"files":11,"share":0.4149540027402623},{"extension":".html","language":"HTML","lines_changed":1447,"files":2,"share":0.28322568017224503},{"extension":".js","language":"JavaScript","lines_changed":691,"files":1,"share":0.13525151693090626},{"extension":".css","language":"CSS","lines_changed":556,"files":1,"share":0.1088275592092386},{"extension":".md","language":"Markdown","lines_changed":203,"files":1,"share":0.03973380309258172},{"extension":".toml","language":"TOML","lines_changed":43,"files":1,"share":0.008416519866901546},{"extension":".gitignore","language":".gitignore","lines_changed":28,"files":1,"share":0.00548052456449403},{"extension":"(no extension)","language":"(no extension)","lines_changed":21,"files":1,"share":0.004110393423370522}],"messages":{"analysed":7,"average_length":56.7,"average_words":8.1,"common_words":[{"word":"add","count":2},{"word":"analysis","count":1},{"word":"animated","count":1},{"word":"build","count":1},{"word":"churn","count":1},{"word":"cli","count":1},{"word":"commit","count":1},{"word":"contained","count":1},{"word":"contributor","count":1},{"word":"dataclasses","count":1},{"word":"day","count":1},{"word":"demo","count":1}],"conventional_count":7,"conventional_share":1.0,"conventional_types":[{"type":"feat","count":3},{"type":"fix","count":2},{"type":"chore","count":1},{"type":"docs","count":1}],"longest":{"text":"feat(stats): add timeline, contributor, heatmap, churn and message analysis","hash":"9325f7c","author":"gitstory-dev","when":"2026-11-16T18:22:47+00:00","length":75},"shortest":{"text":"chore: scaffold the gitstory package","hash":"366d507","author":"gitstory-dev","when":"2026-11-16T18:22:46+00:00","length":36}},"facts":{"biggest_commit":{"hash":"21d4597","subject":"feat(render): build the self-contained animated HTML report and the CLI","author":"gitstory-dev","when":"2026-11-16T18:22:47+00:00","lines_added":1735,"lines_removed":0,"files":8},"longest_streak":{"days":1,"start":"2026-11-16","end":"2026-11-16"},"longest_gap":{"seconds":29,"start":"2026-11-16T18:22:47+00:00","end":"2026-11-16T18:23:16+00:00"},"busiest_day":{"day":"2026-11-16","commits":7}},"meta":{"version":"0.1.0","generated_at":"2026-11-16T18:23:16+00:00","filters":{}}}</script>
+<script id="gitstory-data" type="application/json">{"repo_name":"gitstory","summary":{"commits":13,"contributors":1,"merges":0,"files_touched":29,"lines_added":10163,"lines_removed":47,"first_commit":"2026-11-16T18:22:46+00:00","last_commit":"2026-11-17T17:42:51+00:00","age_days":1},"timeline":[{"start":"2026-11-16","commits":13,"lines_added":10163,"lines_removed":47,"top_message":"feat(render): build the self-contained animated HTML report and the CLI"}],"contributors":[{"name":"gitstory-dev","initials":"GD","color":"hsl(20, 58%, 46%)","commits":13,"lines_added":10163,"lines_removed":47,"first_active":"2026-11-16","last_active":"2026-11-17","sparkline":[10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3]}],"heatmap":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"persona":{"label":"After-hours hacker","emoji":"🌆","description":"77% of commits land between 6pm and 10pm."},"files":[{"path":"examples/demo-report.html","lines_added":2206,"lines_removed":7,"commits":3},{"path":"examples/sample-report.html","lines_added":1344,"lines_removed":0,"commits":1},{"path":"gitstory/assets/report.js","lines_added":1107,"lines_removed":4,"commits":4},{"path":"gitstory/assets/report.css","lines_added":966,"lines_removed":2,"commits":3},{"path":"gitstory/stats.py","lines_added":848,"lines_removed":2,"commits":2},{"path":"gitstory/parser.py","lines_added":427,"lines_removed":4,"commits":2},{"path":"tests/test_stats.py","lines_added":428,"lines_removed":0,"commits":2},{"path":"gitstory/server.py","lines_added":347,"lines_removed":0,"commits":1},{"path":"gitstory/assets/home.js","lines_added":306,"lines_removed":0,"commits":1},{"path":"README.md","lines_added":268,"lines_removed":8,"commits":3},{"path":"gitstory/assets/home.css","lines_added":240,"lines_removed":0,"commits":1},{"path":"tests/test_parser.py","lines_added":190,"lines_removed":0,"commits":2},{"path":"gitstory/github.py","lines_added":182,"lines_removed":0,"commits":1},{"path":"gitstory/cli.py","lines_added":159,"lines_removed":9,"commits":3},{"path":"tests/test_server.py","lines_added":166,"lines_removed":0,"commits":1}],"extensions":[{"extension":".html","language":"HTML","lines_changed":3824,"files":4,"share":0.3745347698334966},{"extension":".py","language":"Python","lines_changed":3393,"files":15,"share":0.33232125367286974},{"extension":".js","language":"JavaScript","lines_changed":1417,"files":2,"share":0.1387855044074437},{"extension":".css","language":"CSS","lines_changed":1208,"files":2,"share":0.11831537708129285},{"extension":".md","language":"Markdown","lines_changed":276,"files":1,"share":0.02703232125367287},{"extension":".toml","language":"TOML","lines_changed":43,"files":1,"share":0.0042115572967678745},{"extension":".gitignore","language":".gitignore","lines_changed":28,"files":1,"share":0.002742409402546523},{"extension":"(no extension)","language":"(no extension)","lines_changed":21,"files":1,"share":0.002056807051909892}],"messages":{"analysed":13,"average_length":56.7,"average_words":8.9,"common_words":[{"word":"add","count":5},{"word":"commit","count":3},{"word":"history","count":3},{"word":"github","count":2},{"word":"gitstory","count":2},{"word":"mode","count":2},{"word":"report","count":2},{"word":"summary","count":2},{"word":"web","count":2},{"word":"added","count":1},{"word":"analysis","count":1},{"word":"animated","count":1}],"conventional_count":13,"conventional_share":1.0,"conventional_types":[{"type":"feat","count":6},{"type":"docs","count":4},{"type":"fix","count":2},{"type":"chore","count":1}],"longest":{"text":"feat(stats): add timeline, contributor, heatmap, churn and message analysis","hash":"9325f7c","author":"gitstory-dev","when":"2026-11-16T18:22:47+00:00","length":75},"shortest":{"text":"docs: describe the commit history","hash":"cdaba19","author":"gitstory-dev","when":"2026-11-17T17:42:51+00:00","length":33}},"facts":{"biggest_commit":{"hash":"21d4597","subject":"feat(render): build the self-contained animated HTML report and the CLI","author":"gitstory-dev","when":"2026-11-16T18:22:47+00:00","lines_added":1735,"lines_removed":0,"files":8},"longest_streak":{"days":2,"start":"2026-11-16","end":"2026-11-17"},"longest_gap":{"seconds":82839,"start":"2026-11-16T18:42:12+00:00","end":"2026-11-17T17:42:51+00:00"},"busiest_day":{"day":"2026-11-16","commits":10}},"history":{"total":13,"max_files":60,"authors":[["gitstory-dev","GD","hsl(20, 58%, 46%)"]],"paths":["examples/demo-report.html","README.md","gitstory/assets/report.js","gitstory/assets/report.css","gitstory/stats.py","tests/test_stats.py","gitstory/assets/template.html","gitstory/parser.py","tests/test_parser.py","docs/home.png","gitstory/server.py","gitstory/assets/home.js","gitstory/assets/home.css","gitstory/github.py","tests/test_server.py","gitstory/assets/home.html","tests/test_github.py","gitstory/cli.py","gitstory/render.py","examples/sample-report.html","tests/test_cli.py","examples/make_demo_repo.py","docs/screenshot.png","tests/test_render.py","gitstory/__main__.py","pyproject.toml",".gitignore","LICENSE","gitstory/__init__.py"],"commits":[["cdaba1969118c144aca784eb644bea51c5151ae2","docs: describe the commit history","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","docs",0,13,13,0,863,6,2,[[0,-1,"M",860,5,0,19,3,3],[1,-1,"M",3,1,0,17,3,3]]],["c91a77060729b00194bca2236ecf5870478eac92","feat(report): add a commit history chapter that loads 10 commits at a time","Each commit opens to show its message, the files it changed and each\nfile's own history across renames. Includes search, type filters,\nper-file history, copy hash and links to GitHub.\n\nCo-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","feat",0,12,12,0,1061,5,5,[[2,-1,"M",384,2,0,11,4,4],[3,-1,"M",376,1,0,10,3,3],[4,-1,"M",188,2,0,7,2,2],[5,-1,"M",82,0,0,8,2,2],[6,-1,"M",31,0,0,12,3,3]]],["f99362c06d3b423cc0538823d1d7ac69f9f101c8","feat(parser): mark files as added, deleted or renamed using --summary","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","feat",0,11,11,82839,61,4,2,[[7,-1,"M",37,4,0,5,2,2],[8,-1,"M",24,0,0,6,2,2]]],["a6a2fbc54b15c866abd92cb964ef8e9b7bb7ddcd","docs: document web mode and GitHub links","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:42:12+00:00","docs",0,10,10,0,62,7,2,[[1,-1,"M",62,7,0,17,2,3],[9,-1,"A",0,0,1,29,1,1]]],["5f1a9fbde89a3647c7a487c23b2940e663d7013e","feat(web): add a web mode where you paste a GitHub link and get its story","gitstory --serve starts a local website. Its home page explains what\ngitstory does and asks for a GitHub link; after the visitor confirms,\na background job clones the repository, shows live progress and opens\nthe report. The CLI also accepts GitHub links directly.\n\nCo-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:42:12+00:00","feat",0,9,9,1136,1669,19,12,[[10,-1,"A",347,0,0,26,1,1],[11,-1,"A",306,0,0,24,1,1],[12,-1,"A",240,0,0,22,1,1],[13,-1,"A",182,0,0,25,1,1],[14,-1,"A",166,0,0,28,1,1],[15,-1,"A",135,0,0,23,1,1],[16,-1,"A",117,0,0,27,1,1],[17,-1,"M",66,7,0,13,3,3],[18,-1,"M",41,10,0,14,2,2],[3,-1,"M",34,1,0,10,2,3],[2,-1,"M",33,1,0,11,3,4],[6,-1,"M",2,0,0,12,2,3]]],["cbf72f8e5df1fe5912cfdd9cfc146350886e8c82","docs: add a sample report of gitstory's own history","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","docs",0,8,8,0,1344,0,1,[[19,-1,"A",1344,0,0,21,1,1]]],["552543b020cb2f2b430a18460c36004970651124","fix(render): word same-day gaps sensibly in the fun facts","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","fix",0,7,7,0,9,3,2,[[0,-1,"M",5,2,0,19,2,3],[2,-1,"M",4,1,0,11,2,4]]],["33742276ba3d6e31ccab24f2823f4a97e6d5664a","fix(cli): use singular nouns in the summary line","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","fix",0,6,6,29,8,3,2,[[17,-1,"M",7,2,0,13,2,3],[20,-1,"M",1,1,0,15,2,2]]],["6aa98645a3d0723eb5f722044b1d7d4eed0296d7","docs: add README, screenshot and demo example","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","docs",0,5,5,0,1690,0,4,[[0,-1,"A",1341,0,0,19,1,3],[1,-1,"A",203,0,0,17,1,3],[21,-1,"A",146,0,0,20,1,1],[22,-1,"A",0,0,1,18,1,1]]],["21d4597ccfef13defeb210858949319f56f1bcc9","feat(render): build the self-contained animated HTML report and the CLI","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,4,4,0,1735,0,8,[[2,-1,"A",686,0,0,11,1,4],[3,-1,"A",556,0,0,10,1,3],[20,-1,"A",106,0,0,15,1,2],[18,-1,"A",104,0,0,14,1,2],[6,-1,"A",99,0,0,12,1,3],[23,-1,"A",88,0,0,16,1,1],[17,-1,"A",86,0,0,13,1,3],[24,-1,"A",10,0,0,9,1,1]]],["9325f7c906884eb13e8d2d6b1897b61cb974d677","feat(stats): add timeline, contributor, heatmap, churn and message analysis","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,3,3,0,1006,0,2,[[4,-1,"A",660,0,0,7,1,2],[5,-1,"A",346,0,0,8,1,2]]],["28b06800f6137a8a9b07bdda92cd769f07f0ea77","feat(parser): read git log into Commit and FileChange dataclasses","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,2,2,1,556,0,2,[[7,-1,"A",390,0,0,5,1,2],[8,-1,"A",166,0,0,6,1,2]]],["366d507d7f93d3944387ce40578ab9a547661027","chore: scaffold the gitstory package","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:46+00:00","chore",0,1,1,-1,99,0,4,[[25,-1,"A",43,0,0,4,1,1],[26,-1,"A",28,0,0,1,1,1],[27,-1,"A",21,0,0,2,1,1],[28,-1,"A",7,0,0,3,1,1]]]]},"meta":{"version":"0.1.0","generated_at":"2026-11-17T17:42:51+00:00","filters":{},"source":null,"links":[]}}</script>
 <script>
 /* gitstory report renderer. Reads the embedded JSON and draws everything with
    plain DOM and SVG. Every string that comes from the repository is inserted
@@ -776,6 +1217,13 @@ ol, ul { padding: 0; list-style: none; }
   function renderHero() {
     var s = DATA.summary;
     byId('repo-name').textContent = DATA.repo_name;
+    var source = DATA.meta && DATA.meta.source;
+    if (source && /^https:\/\//.test(source.url)) {
+      var link = byId('hero-source');
+      link.href = source.url;
+      link.textContent = source.label + ' ↗';
+      link.hidden = false;
+    }
 
     append(byId('hero-lede'), [
       'It began on ', el('span', { 'class': 'date', text: fmtDay(s.first_commit) }), '. ',
@@ -1201,6 +1649,387 @@ ol, ul { padding: 0; list-style: none; }
     }
   }
 
+  // ---------------------------------------------------------------- commit history
+
+  function ordinal(n) {
+    var v = n % 100;
+    var suffix = (v >= 11 && v <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+    return fmtNum(n) + suffix;
+  }
+
+  function fmtTime(iso) {
+    var offset = (iso.match(/([+-]\d\d:\d\d)$/) || [])[1];
+    var zone = !offset || offset === '+00:00' || offset === '-00:00' ? 'UTC' : 'UTC' + offset;
+    return iso.slice(11, 16) + ' ' + zone;
+  }
+
+  function splitPath(path) {
+    var slash = path.lastIndexOf('/');
+    return [
+      slash >= 0 ? el('span', { 'class': 'path-dir', text: path.slice(0, slash + 1) }) : null,
+      el('span', { 'class': 'path-name', text: path.slice(slash + 1) })
+    ];
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).catch(function () { return legacyCopy(text); });
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+  function legacyCopy(text) {
+    var area = el('textarea', { readonly: 'readonly', style: 'position:fixed;top:-100px;opacity:0' });
+    area.value = text;
+    document.body.appendChild(area);
+    area.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(area);
+    if (!ok) throw new Error('copy failed');
+  }
+
+  var STATUS_LABEL = { A: 'New', D: 'Deleted', R: 'Renamed', M: 'Changed' };
+  var PAGE = 10;
+
+  // Returns a function other chapters can call to jump to a commit by hash,
+  // or null when the report has no history.
+  function renderHistory() {
+    var H = DATA.history;
+    if (!H || !H.commits || !H.commits.length) return null;
+    var section = byId('history');
+    section.hidden = false;
+
+    var source = DATA.meta && DATA.meta.source;
+    var githubBase = source && /^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(source.url) ? source.url : null;
+
+    var commits = H.commits.map(function (row, index) {
+      var author = H.authors[row[3]];
+      return {
+        index: index, hash: row[0], subject: row[1], body: row[2],
+        author: author[0], initials: author[1], color: author[2],
+        when: row[4], type: row[5], merge: !!row[6], number: row[7], authorNumber: row[8],
+        sincePrevious: row[9], added: row[10], removed: row[11], filesTotal: row[12],
+        files: row[13].map(function (f) {
+          return {
+            path: H.paths[f[0]], oldPath: f[1] >= 0 ? H.paths[f[1]] : null, status: f[2],
+            added: f[3], removed: f[4], binary: !!f[5], lineage: f[6], touch: f[7], touches: f[8]
+          };
+        }),
+        haystack: null
+      };
+    });
+    var total = commits.length;
+
+    var state = { query: '', type: '', lineage: 0, shown: 0, matches: commits };
+    var list = byId('commit-list');
+    var status = byId('history-status');
+    var more = byId('history-more');
+    var search = byId('history-search');
+    var fileFilter = byId('history-file-filter');
+    var browser = byId('history-browser');
+    var opener = byId('history-open');
+
+    byId('history-open-hint').textContent = total > PAGE
+      ? 'Start with the latest ' + PAGE + ' of ' + count(H.total, 'commit', 'commits') + ', then load more'
+      : 'See all ' + count(total, 'commit', 'commits') + ', newest first';
+
+    // ---- filters
+
+    var typeCounts = {}, merges = 0;
+    commits.forEach(function (c) {
+      if (c.merge) merges++;
+      if (c.type) typeCounts[c.type] = (typeCounts[c.type] || 0) + 1;
+    });
+    var types = Object.keys(typeCounts).sort(function (a, b) { return typeCounts[b] - typeCounts[a] || (a < b ? -1 : 1); }).slice(0, 6);
+    var typeHost = byId('history-types');
+    var typeButtons = [];
+    function typeButton(value, label, n) {
+      var button = el('button', { type: 'button', 'class': 'type-filter', 'aria-pressed': value === state.type ? 'true' : 'false' }, [label, el('b', { text: fmtNum(n) })]);
+      button.addEventListener('click', function () { state.type = state.type === value && value ? '' : value; refresh(true); });
+      button._value = value;
+      typeButtons.push(button);
+      typeHost.appendChild(button);
+    }
+    if (types.length || merges) {
+      typeButton('', 'All', total);
+      types.forEach(function (t) { typeButton(t, t, typeCounts[t]); });
+      if (merges) typeButton(':merge', 'Merges', merges);
+    }
+
+    function haystack(c) {
+      if (c.haystack === null) {
+        c.haystack = [c.subject, c.body, c.author, c.hash].concat(
+          c.files.map(function (f) { return f.path + ' ' + (f.oldPath || ''); })
+        ).join('\n').toLowerCase();
+      }
+      return c.haystack;
+    }
+
+    function matches(c) {
+      if (state.type === ':merge' && !c.merge) return false;
+      if (state.type && state.type !== ':merge' && c.type !== state.type) return false;
+      if (state.lineage && !c.files.some(function (f) { return f.lineage === state.lineage; })) return false;
+      if (!state.query) return true;
+      var text = haystack(c);
+      return state.query.split(/\s+/).every(function (word) { return text.indexOf(word) >= 0; });
+    }
+
+    // ---- rendering
+
+    function factChip(text, milestone) {
+      return el('span', { 'class': 'commit-fact' + (milestone ? ' is-milestone' : ''), text: text });
+    }
+
+    function fileRow(f, j, maxLines) {
+      var lines = f.added + f.removed;
+      var label = f.binary ? 'Binary' : STATUS_LABEL[f.status];
+      var statusClass = f.binary && f.status === 'M' ? 'M' : f.status;
+      var history;
+      if (f.touches <= 1) {
+        history = el('span', { 'class': 'cfile-history', title: 'No other commit changed this file', text: 'Only change' });
+      } else {
+        history = el('button', {
+          type: 'button', 'class': 'cfile-history',
+          title: 'Show every commit that changed this file',
+          'aria-label': 'Change ' + f.touch + ' of ' + f.touches + ' to ' + f.path + '. Show every commit that changed it.',
+          text: 'Change ' + fmtNum(f.touch) + ' of ' + fmtNum(f.touches) + ' ↗'
+        });
+        history.addEventListener('click', function (event) {
+          event.stopPropagation();
+          showFileHistory(f.lineage, f.path);
+        });
+      }
+      return el('li', { 'class': 'cfile' + (state.lineage && f.lineage === state.lineage ? ' is-followed' : ''), style: '--j:' + Math.min(j, 20) }, [
+        el('span', { 'class': 'cfile-status s-' + statusClass, text: label }),
+        el('div', { 'class': 'cfile-path', title: f.path }, splitPath(f.path).concat([
+          f.oldPath ? el('small', { text: 'renamed from ' + f.oldPath }) : null
+        ])),
+        el('span', { 'class': 'cfile-lines', text: f.binary ? 'binary' : '+' + fmtNum(f.added) + ' −' + fmtNum(f.removed) }),
+        lines ? el('span', { 'class': 'cfile-bar', 'aria-hidden': 'true', style: 'width:' + Math.max(2, lines / maxLines * 100).toFixed(1) + '%' }, [
+          f.added ? el('i', { 'class': 'is-added', style: 'flex:' + f.added }) : null,
+          f.removed ? el('i', { 'class': 'is-removed', style: 'flex:' + f.removed }) : null
+        ]) : null,
+        history
+      ]);
+    }
+
+    function details(c) {
+      var facts = [
+        factChip('Commit ' + fmtNum(c.number) + ' of ' + fmtNum(H.total)),
+        c.number === 1 ? factChip('🌱 The very first commit', true) : null,
+        c.authorNumber === 1
+          ? factChip('🎉 ' + c.author + "'s first commit", true)
+          : factChip(c.author + "'s " + ordinal(c.authorNumber) + ' commit'),
+        factChip(weekdayName(c.when) + ', ' + fmtTime(c.when)),
+        c.sincePrevious >= 0
+          ? factChip(c.sincePrevious < 60 ? 'Right after the previous commit' : fmtDuration(c.sincePrevious) + ' after the previous commit')
+          : null
+      ];
+
+      var body = c.body ? el('pre', { 'class': 'commit-body', text: c.body }) : null;
+
+      var filesBlock;
+      if (!c.files.length) {
+        filesBlock = el('p', { 'class': 'cfiles-note', text: c.merge
+          ? 'Merge commits do not list file changes; the changes show up on the commits that were merged.'
+          : 'This commit did not change any files.' });
+      } else {
+        var maxLines = Math.max.apply(null, c.files.map(function (f) { return f.added + f.removed; }).concat([1]));
+        var counts = { A: 0, D: 0, R: 0 };
+        c.files.forEach(function (f) { if (counts[f.status] != null) counts[f.status]++; });
+        var summary = [
+          counts.A ? fmtNum(counts.A) + ' new' : null,
+          counts.D ? fmtNum(counts.D) + ' deleted' : null,
+          counts.R ? fmtNum(counts.R) + ' renamed' : null
+        ].filter(Boolean).join(' · ');
+        filesBlock = [
+          el('div', { 'class': 'cfiles-title' }, [
+            'Files changed (' + fmtNum(c.filesTotal) + ')',
+            summary ? el('small', { text: summary }) : null
+          ]),
+          el('ul', { 'class': 'cfiles' }, c.files.map(function (f, j) { return fileRow(f, j, maxLines); })),
+          c.filesTotal > c.files.length
+            ? el('p', { 'class': 'cfiles-more', text: 'Plus ' + count(c.filesTotal - c.files.length, 'smaller change', 'smaller changes') + ' not listed here.' })
+            : null
+        ];
+      }
+
+      var copy = el('button', { type: 'button', title: 'Copy the full commit hash' }, [
+        el('span', { 'class': 'mono', text: c.hash.slice(0, 10) }), el('span', { text: 'Copy hash' })
+      ]);
+      copy.addEventListener('click', function () {
+        var label = copy.lastChild;
+        copyText(c.hash).then(function () { label.textContent = 'Copied ✓'; }, function () { label.textContent = 'Copy failed'; })
+          .then(function () { setTimeout(function () { label.textContent = 'Copy hash'; }, 1600); });
+      });
+      var actions = el('div', { 'class': 'commit-actions' }, [
+        copy,
+        githubBase ? el('a', { href: githubBase + '/commit/' + c.hash, target: '_blank', rel: 'noopener noreferrer', text: 'View on GitHub ↗' }) : null
+      ]);
+
+      return el('div', { 'class': 'commit-details-body' }, [
+        el('div', { 'class': 'commit-facts' }, facts), body
+      ].concat(filesBlock).concat([actions]));
+    }
+
+    function card(c, i) {
+      var id = 'commit-' + c.hash.slice(0, 12);
+      var item = el('li', { 'class': 'commit is-entering' + (c.merge ? ' is-merge' : ''), id: id, style: '--i:' + i });
+      var tag = c.merge ? el('span', { 'class': 'type-tag t-merge', text: 'merge' })
+        : (c.type ? el('span', { 'class': 'type-tag t-' + c.type, text: c.type }) : null);
+      var lines = c.added + c.removed;
+      var head = el('button', { type: 'button', 'class': 'commit-head', 'aria-expanded': 'false', 'aria-controls': id + '-details' }, [
+        el('span', { 'class': 'avatar is-small', style: 'background:' + c.color, 'aria-hidden': 'true', text: c.initials }),
+        el('span', { 'class': 'commit-main' }, [
+          el('span', { 'class': 'commit-subject' }, [tag, el('span', { 'class': 'commit-subject-text', text: c.subject || '(empty message)' })]),
+          el('span', { 'class': 'commit-meta', style: 'display:block', text: c.author + ' · ' + fmtDay(c.when) + ', ' + c.when.slice(11, 16) + ' · ' + c.hash.slice(0, 7) })
+        ]),
+        c.merge && !c.filesTotal ? el('span', { 'class': 'commit-side' }, el('span', { 'class': 'commit-files' }, [
+          'merged branch', el('span', { 'class': 'commit-chevron', 'aria-hidden': 'true', text: '▾' })
+        ])) : el('span', { 'class': 'commit-side' }, [
+          el('span', { 'class': 'commit-diff' }, [
+            el('span', { 'class': 'add', text: '+' + fmtNum(c.added) }),
+            el('span', { 'class': 'del', text: '−' + fmtNum(c.removed) })
+          ]),
+          lines ? el('span', { 'class': 'diffbar', 'aria-hidden': 'true' }, [
+            c.added ? el('i', { 'class': 'is-added', style: 'flex:' + c.added }) : null,
+            c.removed ? el('i', { 'class': 'is-removed', style: 'flex:' + c.removed }) : null
+          ]) : null,
+          el('span', { 'class': 'commit-files' }, [
+            count(c.filesTotal, 'file', 'files'),
+            el('span', { 'class': 'commit-chevron', 'aria-hidden': 'true', text: '▾' })
+          ])
+        ])
+      ]);
+      var inner = el('div', { 'class': 'commit-details-inner' });
+      var panel = el('div', { 'class': 'commit-details', id: id + '-details', role: 'region', 'aria-label': 'Changes in ' + c.hash.slice(0, 7) }, inner);
+      head.addEventListener('click', function () { toggle(item, head, inner, c); });
+      item.addEventListener('animationend', function (event) {
+        if (event.target === item) item.classList.remove('is-entering');
+      });
+      return append(item, el('article', { 'class': 'commit-card' }, [head, panel]));
+    }
+
+    function toggle(item, head, inner, c, forceOpen) {
+      var open = forceOpen != null ? forceOpen : !item.classList.contains('is-open');
+      if (open && !inner.firstChild) inner.appendChild(details(c)); // built on first open only
+      item.classList.toggle('is-open', open);
+      head.setAttribute('aria-expanded', String(open));
+    }
+
+    function updateStatus() {
+      var n = state.matches.length;
+      var filtered = state.query || state.type || state.lineage;
+      var text;
+      if (!n) text = 'No commits match.';
+      else if (filtered) text = 'Showing ' + fmtNum(state.shown) + ' of ' + count(n, 'matching commit', 'matching commits') + '.';
+      else text = 'Showing ' + fmtNum(state.shown) + ' of ' + count(n, 'commit', 'commits') + ', newest first.';
+      if (H.total > total && !filtered) text += ' This report includes the newest ' + fmtNum(total) + ' of ' + fmtNum(H.total) + '.';
+      status.textContent = text;
+      var left = n - state.shown;
+      more.parentNode.hidden = left <= 0;
+      more.textContent = '';
+      append(more, ['Load ' + Math.min(PAGE, left) + ' more', el('small', { text: '(' + fmtNum(left) + ' left)' })]);
+      typeButtons.forEach(function (b) { b.setAttribute('aria-pressed', String(b._value === state.type)); });
+    }
+
+    function showMore(focusFirst) {
+      var next = state.matches.slice(state.shown, state.shown + PAGE);
+      var first = null;
+      next.forEach(function (c, i) {
+        var node = card(c, i);
+        if (!first) first = node;
+        list.appendChild(node);
+      });
+      state.shown += next.length;
+      updateStatus();
+      if (focusFirst && first) first.querySelector('.commit-head').focus({ preventScroll: true });
+    }
+
+    function refresh(reset) {
+      state.matches = commits.filter(matches);
+      if (reset) {
+        list.textContent = '';
+        state.shown = 0;
+        showMore(false);
+      } else {
+        updateStatus();
+      }
+    }
+
+    function showFileHistory(lineage, path) {
+      state.lineage = lineage;
+      // Name the file by its newest name, from the most recent commit that touched it.
+      var latest = path;
+      for (var i = 0; i < commits.length; i++) {
+        var hit = commits[i].files.filter(function (f) { return f.lineage === lineage; })[0];
+        if (hit) { latest = hit.path; break; }
+      }
+      fileFilter.textContent = '';
+      append(fileFilter, [
+        el('span', null, ['Every commit that changed ', el('span', { 'class': 'mono', text: latest })]),
+        (function () {
+          var clear = el('button', { type: 'button', text: 'Show all commits ✕' });
+          clear.addEventListener('click', function () { state.lineage = 0; fileFilter.hidden = true; refresh(true); });
+          return clear;
+        })()
+      ]);
+      fileFilter.hidden = false;
+      refresh(true);
+      section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    }
+
+    var debounce = null;
+    search.addEventListener('input', function () {
+      clearTimeout(debounce);
+      debounce = setTimeout(function () {
+        state.query = search.value.trim().toLowerCase();
+        refresh(true);
+      }, 150);
+    });
+
+    more.addEventListener('click', function (event) { showMore(event.detail === 0); });
+
+    function open() {
+      if (!browser.hidden) return;
+      byId('history-start').hidden = true;
+      opener.setAttribute('aria-expanded', 'true');
+      browser.hidden = false;
+      if (!reduceMotion) browser.classList.add('is-entering');
+      refresh(true);
+      list.focus({ preventScroll: true });
+    }
+    opener.addEventListener('click', open);
+
+    // Used by other chapters: open the history on one commit.
+    return function jumpTo(hashPrefix) {
+      open();
+      state.query = hashPrefix.toLowerCase();
+      state.type = '';
+      state.lineage = 0;
+      fileFilter.hidden = true;
+      search.value = hashPrefix;
+      refresh(true);
+      var item = list.firstChild;
+      if (item) {
+        toggle(item, item.querySelector('.commit-head'), item.querySelector('.commit-details-inner'),
+          state.matches[0], true);
+        item.classList.add('is-flash');
+      }
+      section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    };
+  }
+
+  var jumpToCommit = null;
+
+  // A short hash that opens the commit in the history chapter, when there is one.
+  function hashRef(hash) {
+    if (!jumpToCommit) return el('span', { 'class': 'mono', text: hash });
+    var button = el('button', { type: 'button', 'class': 'hash-link', title: 'Open this commit in the commit history', text: hash });
+    button.addEventListener('click', function () { jumpToCommit(hash); });
+    return button;
+  }
+
   // ---------------------------------------------------------------- messages
 
   function tile(value, unit, label, extra) {
@@ -1215,7 +2044,7 @@ ol, ul { padding: 0; list-style: none; }
     return el('figure', { 'class': 'quote', style: 'margin:0' }, [
       el('div', { 'class': 'quote-kind', text: kind + ', ' + count(ref.length, 'character', 'characters') }),
       el('blockquote', { 'class': 'quote-text', style: 'margin-left:0;margin-right:0', text: ref.text || '(empty message)' }),
-      el('figcaption', { 'class': 'quote-meta' }, [ref.author + ', ' + fmtDay(ref.when) + ', ', el('span', { 'class': 'mono', text: ref.hash })])
+      el('figcaption', { 'class': 'quote-meta' }, [ref.author + ', ' + fmtDay(ref.when) + ', ', hashRef(ref.hash)])
     ]);
   }
 
@@ -1271,7 +2100,7 @@ ol, ul { padding: 0; list-style: none; }
         count(big.lines_added + big.lines_removed, 'line', 'lines'), [
           el('q', { text: big.subject || '(empty message)' }),
           ' by ' + big.author + ' on ' + fmtDay(big.when) + ', touching ' + count(big.files, 'file', 'files') + ' (',
-          el('span', { 'class': 'mono', text: big.hash }), ').'
+          hashRef(big.hash), ').'
         ]));
     }
     var streak = f.longest_streak;
@@ -1299,14 +2128,38 @@ ol, ul { padding: 0; list-style: none; }
       (meta.generated_at ? ' on ' + fmtDay(meta.generated_at) : '') + '.';
   }
 
+  // Pages served by `gitstory --serve` remember the theme picked on the home
+  // page. A standalone report file keeps the theme it was generated with.
+  var served = !!(DATA.meta && DATA.meta.links && DATA.meta.links.length);
+  var THEME_KEY = 'gitstory-theme';
+
   function setupTheme() {
     var button = byId('theme-toggle');
+    if (served) {
+      try {
+        var saved = window.localStorage.getItem(THEME_KEY);
+        if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+      } catch (e) { /* storage may be unavailable */ }
+    }
     function label() { button.textContent = root.getAttribute('data-theme') === 'dark' ? 'Light theme' : 'Dark theme'; }
     button.addEventListener('click', function () {
-      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      if (served) { try { window.localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ } }
       label();
     });
     label();
+  }
+
+  function renderNav() {
+    var links = (DATA.meta && DATA.meta.links) || [];
+    var nav = byId('report-nav');
+    links.forEach(function (link) {
+      // Only same-site paths: the nav is for the local web mode.
+      if (typeof link.href !== 'string' || link.href.charAt(0) !== '/' || link.href.charAt(1) === '/') return;
+      nav.appendChild(el('a', { href: link.href, text: link.label }));
+    });
+    nav.hidden = !nav.children.length;
   }
 
   function setupReveal(hooks) {
@@ -1327,11 +2180,13 @@ ol, ul { padding: 0; list-style: none; }
   }
 
   setupTheme();
+  renderNav();
   renderHero();
   var startTimeline = renderTimeline();
   renderContributors();
   renderHeatmap();
   renderChurn();
+  jumpToCommit = renderHistory();
   renderMessages();
   renderFacts();
   renderFooter();
