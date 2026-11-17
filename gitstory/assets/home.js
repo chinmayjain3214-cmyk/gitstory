@@ -184,6 +184,17 @@
     if (event.persisted) { clearTimeout(current.timer); show('form'); }
   });
 
+  // ---------------------------------------------------------------- hosted
+  // On a public server the work happens there, not on the visitor's computer.
+  if (DATA.public) {
+    var limit = DATA.max_repo_mb ? ' Repositories up to ' + DATA.max_repo_mb + ' MB work here.' : '';
+    byId('confirm-note').textContent = 'gitstory will download this public repository\'s history to its server, ' +
+      'read it, and delete the copy afterwards. Large projects can take a minute or two.' + limit;
+    byId('privacy-note').textContent = '🔒 Only public GitHub repositories. The copy is deleted as soon as it has been ' +
+      'read; finished stories stay on the server for a while so their links keep working. Want it on your own ' +
+      'computer, for private or very big projects? gitstory is free and open source.';
+  }
+
   // ---------------------------------------------------------------- examples
 
   var examples = byId('examples');

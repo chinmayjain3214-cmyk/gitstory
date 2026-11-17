@@ -1,0 +1,20 @@
+# One-click deploy on Render's free plan: New -> Blueprint -> pick this repository.
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+services:
+  - type: web
+    name: gitstory
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit          # redeploy on every push to the main branch
+    envVars:
+      - key: GITSTORY_MAX_REPO_MB        # biggest repository download allowed
+        value: "150"
+      - key: GITSTORY_CLONE_TIMEOUT      # seconds before a clone is stopped
+        value: "300"
+      - key: GITSTORY_MAX_STORIES        # finished stories kept in memory
+        value: "10"
+      - key: GITSTORY_WORKERS            # stories built at the same time (1 fits the free 512 MB)
+        value: "1"
+      - key: GITSTORY_PER_VISITOR        # new stories per visitor every 10 minutes
+        value: "6"

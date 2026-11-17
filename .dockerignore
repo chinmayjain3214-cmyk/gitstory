@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+.pytest_cache
+**/__pycache__
+*.egg-info
+build
+dist
+docs
+examples
+tests
+*.html
+setup.bat
+start.bat

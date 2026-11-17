@@ -116,8 +116,12 @@ def render_report(
     })
 
 
-def render_home(theme: str = "dark", examples: Optional[List[str]] = None) -> str:
-    """Return the web mode's landing page: what gitstory does, and a link form."""
+def render_home(theme: str = "dark", examples: Optional[List[str]] = None,
+                public: bool = False, max_repo_mb: Optional[int] = None) -> str:
+    """Return the web mode's landing page: what gitstory does, and a link form.
+
+    ``public`` switches the wording from "on this computer" to a hosted site.
+    """
     _check_theme(theme)
     return _fill("home.html", {
         "TITLE": "gitstory · the story of any GitHub repository",
@@ -125,7 +129,8 @@ def render_home(theme: str = "dark", examples: Optional[List[str]] = None) -> st
         "VERSION": html.escape(__version__),
         "CSS": load_asset("report.css") + "\n" + load_asset("home.css"),
         "JS": load_asset("home.js"),
-        "DATA": to_script_safe_json({"version": __version__, "examples": examples or []}),
+        "DATA": to_script_safe_json({"version": __version__, "examples": examples or [],
+                                     "public": public, "max_repo_mb": max_repo_mb}),
     })
 
 

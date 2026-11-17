@@ -76,6 +76,27 @@ Links can be pasted the way you copy them: `https://github.com/owner/repo`, with
 
 Press `Ctrl+C` in the terminal to stop the server.
 
+### As a public website (free hosting)
+
+The web mode can run as a website anyone can use. The repository includes a `Dockerfile` and a Render Blueprint (`render.yaml`) for [Render](https://render.com)'s free plan:
+
+1. Push this repository to your GitHub account.
+2. Sign in to Render with GitHub, choose **New → Blueprint**, and pick the repository.
+3. Press **Deploy**. A few minutes later the site is live at `https://<name>.onrender.com`, and every push to `main` redeploys it.
+
+On a host, gitstory runs as `gitstory --serve --public`: it listens on `0.0.0.0:$PORT`, accepts the site's own address, logs each story, and applies limits that suit a small free server. Each one can be changed with an environment variable:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `GITSTORY_MAX_REPO_MB` | 150 | Stop clones that download more than this |
+| `GITSTORY_CLONE_TIMEOUT` | 300 | Seconds before a clone is stopped |
+| `GITSTORY_MAX_STORIES` | 10 | Finished stories kept in memory (oldest go first) |
+| `GITSTORY_WORKERS` | 1 | Stories built at the same time |
+| `GITSTORY_MAX_WAITING` | 6 | Stories waiting or being built before new ones are refused |
+| `GITSTORY_PER_VISITOR` | 6 | New stories one visitor may start every 10 minutes |
+
+`GET /healthz` answers `ok` for the host's health checks. Render's free plan sleeps after 15 minutes without visitors; the next visit wakes it in under a minute, and stories built before the nap are gone (their links send people to the home page with the repository filled in, one click from rebuilding it). Only public repositories work on a hosted server.
+
 ### On the command line
 
 ```bash
@@ -205,6 +226,8 @@ gitstory/
 │   └── test_cli.py        # end to end against a temporary repository
 ├── examples/
 ├── docs/                  # screenshot.png, home.png
+├── Dockerfile             # gitstory as a public website
+├── render.yaml            # Render Blueprint for the free plan
 ├── pyproject.toml
 ├── LICENSE
 └── README.md
@@ -248,7 +271,6 @@ The suite covers the parser (merges, binary files, both rename notations, quoted
 ## Roadmap
 
 - GitHub API mode: add pull requests, issues and releases to the story.
-- A hosted version of the web mode, so people can use it without installing anything.
 - Compare two repositories, or two periods of the same one, side by side.
 - Export single charts as images.
 - `--exclude` patterns for lockfiles and generated code.

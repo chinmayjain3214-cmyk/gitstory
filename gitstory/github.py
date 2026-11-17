@@ -98,6 +98,15 @@ def parse_progress(line: str) -> Optional[tuple]:
     return match.group("phase"), int(match.group("percent")), size.group(1) if size else ""
 
 
+_UNITS = {"KiB": 1024, "MiB": 1024 ** 2, "GiB": 1024 ** 3}
+
+
+def size_in_bytes(size: str) -> int:
+    """``"12.5 MiB"`` -> bytes; an empty or unknown size counts as 0."""
+    match = re.match(r"\s*(\d+(?:\.\d+)?)\s*([KMG]iB)", size or "")
+    return int(float(match.group(1)) * _UNITS[match.group(2)]) if match else 0
+
+
 def explain_clone_failure(stderr: str, repo: GitHubRepo) -> str:
     """Turn git's error output into a sentence a person can act on."""
     low = stderr.lower()
@@ -120,11 +129,13 @@ def clone_repository(
     on_progress: Optional[ProgressCallback] = None,
     timeout: float = 900.0,
     url: Optional[str] = None,
+    max_bytes: Optional[int] = None,
 ) -> Path:
     """Clone the default branch of ``repo`` (bare, no tags) into ``destination``.
 
     ``url`` overrides the address cloned from; the tests use it to clone a
-    local repository instead of reaching the network.
+    local repository instead of reaching the network. ``max_bytes`` stops the
+    clone as soon as git reports having downloaded more than that.
     """
     ensure_git_available()
     target = Path(destination)
@@ -141,6 +152,7 @@ def clone_repository(
         raise GitNotFoundError("git was not found") from exc
 
     timed_out = threading.Event()
+    too_big = threading.Event()
 
     def kill() -> None:
         timed_out.set()
@@ -170,11 +182,17 @@ def clone_repository(
                 progress = parse_progress(line)
                 if progress and on_progress:
                     on_progress(*progress)
+                if progress and max_bytes and size_in_bytes(progress[2]) > max_bytes:
+                    too_big.set()
+                    process.kill()
         if pending.strip():
             captured.append(pending.decode("utf-8", errors="replace"))
         code = process.wait()
     finally:
         timer.cancel()
+    if too_big.is_set():
+        raise CloneError(f"{repo.slug} is bigger than {max_bytes // (1024 * 1024):,} MB, "
+                         "the limit on this server. Run gitstory on your own computer for big projects.")
     if timed_out.is_set():
         raise CloneError(f"cloning {repo.slug} took longer than {int(timeout)} seconds and was stopped")
     if code != 0:

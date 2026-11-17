@@ -115,3 +115,11 @@ def test_clone_repository_failure_is_explained(tmp_path: Path):
     with pytest.raises(CloneError) as error:
         clone_repository(GitHubRepo("me", "missing"), tmp_path / "clone.git", url=str(tmp_path / "missing"))
     assert "git clone failed" in str(error.value) or "not found" in str(error.value)
+
+
+def test_size_in_bytes():
+    from gitstory.github import size_in_bytes
+    assert size_in_bytes("1.50 MiB") == 1572864
+    assert size_in_bytes("512 KiB") == 524288
+    assert size_in_bytes("2 GiB") == 2 * 1024 ** 3
+    assert size_in_bytes("") == 0 and size_in_bytes("soon") == 0

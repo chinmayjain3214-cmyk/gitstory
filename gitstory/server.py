@@ -31,11 +31,13 @@ import threading
 import time
 import uuid
 import webbrowser
+import os
+from collections import deque
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
 from urllib.parse import unquote, urlsplit
 
 from .github import GitHubRepo, clone_repository, parse_github_url
@@ -55,6 +57,57 @@ PHASE_LABELS = {
     "Receiving": "Downloading",
     "Resolving": "Unpacking",
 }
+
+
+# --------------------------------------------------------------------------
+# Limits for a public server
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Limits:
+    """What one visitor may ask of a server that is open to everyone.
+
+    The defaults (no limits) suit gitstory on your own computer; ``public()``
+    gives settings for a small free hosting plan, each one adjustable with an
+    environment variable.
+    """
+
+    max_repo_mb: Optional[int] = None        # stop clones that download more than this
+    clone_timeout: float = 900.0             # seconds
+    max_stories: Optional[int] = None        # finished stories kept in memory
+    max_waiting: Optional[int] = None        # stories being built or waiting at once
+    per_client: Optional[int] = None         # new stories per visitor ...
+    per_client_window: float = 600.0         # ... in this many seconds
+    workers: int = MAX_CONCURRENT_CLONES     # stories built at the same time
+
+    @classmethod
+    def public(cls, env: Optional[Dict[str, str]] = None) -> "Limits":
+        env = dict(os.environ if env is None else env)
+
+        def number(name: str, default: float) -> float:
+            try:
+                return float(env.get(name, default))
+            except ValueError:
+                return default
+
+        return cls(
+            max_repo_mb=int(number("GITSTORY_MAX_REPO_MB", 150)),
+            clone_timeout=number("GITSTORY_CLONE_TIMEOUT", 300),
+            max_stories=int(number("GITSTORY_MAX_STORIES", 10)),
+            max_waiting=int(number("GITSTORY_MAX_WAITING", 6)),
+            per_client=int(number("GITSTORY_PER_VISITOR", 6)),
+            per_client_window=number("GITSTORY_PER_VISITOR_WINDOW", 600),
+            workers=max(1, int(number("GITSTORY_WORKERS", 1))),   # one at a time fits in 512 MB
+        )
+
+
+class Busy(GitStoryError):
+    """The server cannot take another story right now."""
+
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 # --------------------------------------------------------------------------
@@ -102,26 +155,66 @@ class StoryService:
     """Runs and remembers jobs. Thread-safe; one instance per server."""
 
     def __init__(self, workdir: Path, clone: CloneFunction = clone_repository,
-                 max_concurrent: int = MAX_CONCURRENT_CLONES) -> None:
+                 max_concurrent: int = MAX_CONCURRENT_CLONES, limits: Limits = Limits(),
+                 log: Optional[Callable[[str], None]] = None) -> None:
         self.workdir = Path(workdir)
         self.clone = clone
+        self.limits = limits
+        self.log = log or (lambda message: None)
         self._jobs: Dict[str, Job] = {}
         self._by_slug: Dict[str, Job] = {}
+        self._recent: Dict[str, Deque[float]] = {}
         self._lock = threading.Lock()
         self._slots = threading.Semaphore(max_concurrent)
 
-    def submit(self, repo: GitHubRepo, refresh: bool = False) -> Job:
-        """Start a job for ``repo``, or return the one already running or finished."""
+    def submit(self, repo: GitHubRepo, refresh: bool = False, client: str = "") -> Job:
+        """Start a job for ``repo``, or return the one already running or finished.
+
+        Raises ``Busy`` when a limit says no.
+        """
         key = repo.slug.lower()
+        limits = self.limits
+        now = time.monotonic()
         with self._lock:
             existing = self._by_slug.get(key)
             if existing and existing.state != "error" and not (refresh and existing.state == "done"):
                 return existing
+            if limits.max_waiting is not None:
+                waiting = sum(1 for job in self._jobs.values() if job.state not in ("done", "error"))
+                if waiting >= limits.max_waiting:
+                    raise Busy("gitstory is busy with other stories right now. Try again in a minute.",
+                               HTTPStatus.SERVICE_UNAVAILABLE)
+            if limits.per_client is not None and client:
+                times = self._recent.setdefault(client, deque())
+                while times and now - times[0] > limits.per_client_window:
+                    times.popleft()
+                if len(times) >= limits.per_client:
+                    minutes = max(1, int(limits.per_client_window // 60))
+                    raise Busy(f"you can build {limits.per_client} new stories every {minutes} minutes. "
+                               "Try again a little later.", HTTPStatus.TOO_MANY_REQUESTS)
+                times.append(now)
+                if len(self._recent) > 10000:      # forget visitors with nothing recent
+                    for name in [n for n, t in self._recent.items() if not t]:
+                        del self._recent[name]
             job = Job(id=uuid.uuid4().hex[:12], repo=repo)
             self._jobs[job.id] = job
             self._by_slug[key] = job
+            self._forget_old()
+        self.log(f"story requested: {repo.slug}")
         threading.Thread(target=self._run, args=(job,), name=f"gitstory-{job.id}", daemon=True).start()
         return job
+
+    def _forget_old(self) -> None:
+        """Keep at most ``max_stories`` finished stories (and their jobs). Call with the lock held."""
+        limit = self.limits.max_stories
+        if limit is None:
+            return
+        finished: List[Job] = sorted((job for job in self._jobs.values() if job.finished is not None),
+                                     key=lambda job: job.finished or 0.0)
+        for job in finished[:max(0, len(finished) - limit)]:
+            self._jobs.pop(job.id, None)
+            if self._by_slug.get(job.repo.slug.lower()) is job:
+                del self._by_slug[job.repo.slug.lower()]
 
     def get(self, job_id: str) -> Optional[Job]:
         with self._lock:
@@ -144,7 +237,11 @@ class StoryService:
                     if size:
                         job.detail = size
 
-                clone_path = self.clone(job.repo, folder / "repo.git", on_progress=progress)
+                options: Dict[str, Any] = {}
+                if self.limits.max_repo_mb is not None:
+                    options = {"max_bytes": self.limits.max_repo_mb * 1024 * 1024,
+                               "timeout": self.limits.clone_timeout}
+                clone_path = self.clone(job.repo, folder / "repo.git", on_progress=progress, **options)
                 job.state, job.phase, job.percent, job.detail = "analysing", "Reading the history", None, ""
                 try:
                     commits = read_commits(clone_path)
@@ -160,6 +257,9 @@ class StoryService:
         finally:
             job.finished = time.monotonic()
             shutil.rmtree(folder, ignore_errors=True)  # the clone is not needed once analysed
+            self.log(f"story {job.state}: {job.repo.slug}" + (f" ({job.error})" if job.error else ""))
+            with self._lock:
+                self._forget_old()
 
 
 # --------------------------------------------------------------------------
@@ -180,10 +280,12 @@ class StoryServer(ThreadingHTTPServer):
             self.socket.setsockopt(socket.SOL_SOCKET, exclusive, 1)
         super().server_bind()
 
-    def __init__(self, address: Tuple[str, int], service: StoryService) -> None:
+    def __init__(self, address: Tuple[str, int], service: StoryService, public: bool = False) -> None:
         super().__init__(address, StoryHandler)
         self.service = service
-        self.home_page = render_home(examples=EXAMPLES)
+        self.public = public
+        self.home_page = render_home(examples=EXAMPLES, public=public,
+                                     max_repo_mb=service.limits.max_repo_mb)
 
 
 class StoryHandler(BaseHTTPRequestHandler):
@@ -215,7 +317,17 @@ class StoryHandler(BaseHTTPRequestHandler):
     def _html(self, status: int, document: str, extra: Optional[Dict[str, str]] = None) -> None:
         self._send(status, document.encode("utf-8"), "text/html; charset=utf-8", extra)
 
+    def _client(self) -> str:
+        """Who is asking: the first X-Forwarded-For address behind a hosting proxy."""
+        if self.server.public:
+            forwarded = (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+            if forwarded:
+                return forwarded
+        return str(self.client_address[0])
+
     def _host_allowed(self) -> bool:
+        if self.server.public:
+            return True   # a public site is reached by its own name; there is no local server to protect
         host = (self.headers.get("Host") or "").strip().lower()
         if host.startswith("["):
             name = host[1:].split("]", 1)[0]
@@ -265,6 +377,8 @@ class StoryHandler(BaseHTTPRequestHandler):
 
         if not parts:
             self._html(HTTPStatus.OK, self.server.home_page)
+        elif parts == ["healthz"]:
+            self._send(HTTPStatus.OK, b"ok\n", "text/plain; charset=utf-8")
         elif parts == ["favicon.ico"]:
             self._send(HTTPStatus.NO_CONTENT, b"", "image/x-icon")
         elif len(parts) == 3 and parts[:2] == ["api", "stories"]:
@@ -295,7 +409,11 @@ class StoryHandler(BaseHTTPRequestHandler):
         if path == "/api/resolve":
             self._json(HTTPStatus.OK, {"slug": repo.slug, "owner": repo.owner, "name": repo.name, "url": repo.web_url})
             return
-        job = self.server.service.submit(repo, refresh=bool(data.get("refresh")))
+        try:
+            job = self.server.service.submit(repo, refresh=bool(data.get("refresh")), client=self._client())
+        except Busy as busy:
+            self._json(busy.status, {"error": str(busy)})
+            return
         self._json(HTTPStatus.ACCEPTED, job.to_json())
 
     def _story(self, owner: str, name: str, download: bool) -> None:
@@ -327,21 +445,21 @@ def _not_found_page() -> str:
 # --------------------------------------------------------------------------
 
 
-def make_server(host: str, port: int, service: StoryService) -> StoryServer:
-    return StoryServer((host, port), service)
+def make_server(host: str, port: int, service: StoryService, public: bool = False) -> StoryServer:
+    return StoryServer((host, port), service, public=public)
 
 
-def bind_server(host: str, port: int, service: StoryService) -> Tuple[StoryServer, Optional[str]]:
+def bind_server(host: str, port: int, service: StoryService, public: bool = False) -> Tuple[StoryServer, Optional[str]]:
     """Start listening, moving to a free port if the chosen one is busy.
 
     Returns the server and, when it had to move, a note explaining why.
     """
     try:
-        return make_server(host, port, service), None
+        return make_server(host, port, service, public), None
     except OSError as error:
-        if port == 0:
+        if port == 0 or public:   # a hosting platform tells us which port to use; never wander off it
             raise
-        server = make_server(host, 0, service)
+        server = make_server(host, 0, service, public)
         note = (
             f"Port {port} is already in use (probably an older gitstory that is still "
             f"running; close that window to stop it), so this one uses port "
@@ -350,25 +468,42 @@ def bind_server(host: str, port: int, service: StoryService) -> Tuple[StoryServe
         return server, note
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False) -> int:
-    """Run the web mode until Ctrl+C. Returns a process exit code."""
+def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False, public: bool = False) -> int:
+    """Run the web mode until Ctrl+C (or, on a hosting platform, until stopped).
+
+    ``public`` is for running gitstory as a website for everyone: it accepts
+    any host name, logs each story, and applies ``Limits.public()``.
+    """
+    limits = Limits.public() if public else Limits()
+    log = (lambda message: print(message, flush=True)) if public else None
     with tempfile.TemporaryDirectory(prefix="gitstory-") as workdir:
-        service = StoryService(Path(workdir))
+        service = StoryService(Path(workdir), limits=limits, log=log, max_concurrent=limits.workers)
         try:
-            server, note = bind_server(host, port, service)
+            server, note = bind_server(host, port, service, public)
         except OSError as error:
             raise GitStoryError(
                 f"could not listen on {host}:{port} ({error.strerror or error}); "
                 "is something else using that port? Try --port 0 to pick a free one."
             ) from error
-        shown_host = "localhost" if host in ("127.0.0.1", "0.0.0.0", "::", "") else host
-        url = f"http://{shown_host}:{server.server_address[1]}/"
-        if note:
-            print(note)
-        print(f"gitstory is running at {url}")
-        print("Paste a GitHub link there to see its story. Press Ctrl+C to stop.")
-        if open_browser:
-            webbrowser.open(url)
+        if public:
+            # Hosting platforms stop a service with SIGTERM; finish cleanly.
+            import signal
+
+            def stop(*_: Any) -> None:
+                threading.Thread(target=server.shutdown, daemon=True).start()
+
+            signal.signal(signal.SIGTERM, stop)
+            print(f"gitstory is serving the public website on {host}:{server.server_address[1]} "
+                  f"(repositories up to {limits.max_repo_mb} MB, {limits.max_stories} stories kept)", flush=True)
+        else:
+            shown_host = "localhost" if host in ("127.0.0.1", "0.0.0.0", "::", "") else host
+            url = f"http://{shown_host}:{server.server_address[1]}/"
+            if note:
+                print(note)
+            print(f"gitstory is running at {url}")
+            print("Paste a GitHub link there to see its story. Press Ctrl+C to stop.")
+            if open_browser:
+                webbrowser.open(url)
         try:
             server.serve_forever()
         except KeyboardInterrupt:

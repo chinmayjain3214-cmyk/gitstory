@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import tempfile
 import webbrowser
@@ -59,8 +60,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--serve", action="store_true",
         help="start a local website where you paste a GitHub link and get its story",
     )
-    web.add_argument("--host", default="127.0.0.1", help="address to listen on with --serve (default: 127.0.0.1)")
-    web.add_argument("--port", type=int, default=8765, help="port to listen on with --serve (default: 8765; 0 picks a free one)")
+    web.add_argument("--host", default=None,
+                     help="address to listen on with --serve (default: 127.0.0.1, or 0.0.0.0 with --public)")
+    web.add_argument("--port", type=int, default=None,
+                     help="port to listen on with --serve (default: 8765, or $PORT with --public; 0 picks a free one)")
+    web.add_argument(
+        "--public", action="store_true",
+        help="run the web mode as a public website (for hosting): accept any address, "
+             "log each story, and limit repository size and requests per visitor",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser
 
@@ -114,7 +122,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         from .server import serve  # imported lazily: only the web mode needs it
 
         try:
-            return serve(args.host, args.port, open_browser=args.open_report)
+            host = args.host or ("0.0.0.0" if args.public else "127.0.0.1")
+            port = args.port
+            if port is None:
+                port = int(os.environ.get("PORT", 8765)) if args.public else 8765
+            return serve(host, port, open_browser=args.open_report, public=args.public)
         except GitStoryError as error:
             print(f"gitstory: error: {error}", file=sys.stderr)
             return 1

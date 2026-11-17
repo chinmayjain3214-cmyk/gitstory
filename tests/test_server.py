@@ -17,7 +17,7 @@ import pytest
 
 from gitstory.github import CloneError, GitHubRepo, clone_repository
 from gitstory.render import render_home
-from gitstory.server import StoryService, bind_server, make_server
+from gitstory.server import Busy, Limits, StoryService, bind_server, make_server
 
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
 
@@ -190,3 +190,95 @@ def test_free_port_is_used_as_asked(tmp_path):
         assert note is None
     finally:
         server.server_close()
+
+
+# -- public mode ----------------------------------------------------------------
+
+
+def test_public_limits_come_from_the_environment():
+    limits = Limits.public({"GITSTORY_MAX_REPO_MB": "50", "GITSTORY_PER_VISITOR": "2", "GITSTORY_CLONE_TIMEOUT": "x"})
+    assert limits.max_repo_mb == 50 and limits.per_client == 2
+    assert limits.clone_timeout == 300  # unreadable values fall back to the default
+    assert Limits().max_repo_mb is None and Limits().per_client is None  # no limits on your own computer
+
+
+def _slow_service(tmp_path: Path, limits: Limits, release: threading.Event) -> StoryService:
+    def clone(repo: GitHubRepo, destination: Path, on_progress=None, **options) -> Path:
+        release.wait(10)
+        raise CloneError("stopped by the test")
+    return StoryService(tmp_path, clone=clone, limits=limits)
+
+
+def test_visitors_are_limited_per_window(tmp_path: Path):
+    release = threading.Event()
+    service = _slow_service(tmp_path, Limits(per_client=2), release)
+    try:
+        service.submit(GitHubRepo("a", "one"), client="1.2.3.4")
+        service.submit(GitHubRepo("a", "two"), client="1.2.3.4")
+        service.submit(GitHubRepo("a", "one"), client="1.2.3.4")  # already running: no new story, no charge
+        with pytest.raises(Busy) as busy:
+            service.submit(GitHubRepo("a", "three"), client="1.2.3.4")
+        assert busy.value.status == 429
+        service.submit(GitHubRepo("a", "three"), client="5.6.7.8")  # someone else is fine
+    finally:
+        release.set()
+
+
+def test_server_refuses_when_too_many_stories_are_waiting(tmp_path: Path):
+    release = threading.Event()
+    service = _slow_service(tmp_path, Limits(max_waiting=1), release)
+    try:
+        service.submit(GitHubRepo("a", "one"))
+        with pytest.raises(Busy) as busy:
+            service.submit(GitHubRepo("a", "two"))
+        assert busy.value.status == 503
+    finally:
+        release.set()
+
+
+@needs_git
+def test_only_the_newest_stories_are_kept(tmp_path: Path):
+    origin = _origin(tmp_path / "origin")
+
+    def clone(repo: GitHubRepo, destination: Path, on_progress=None, **options) -> Path:
+        assert options == {"max_bytes": 5 * 1024 * 1024, "timeout": 30}
+        return clone_repository(repo, destination, url=str(origin))
+
+    work = tmp_path / "work"
+    work.mkdir()
+    service = StoryService(work, clone=clone, limits=Limits(max_stories=2, max_repo_mb=5, clone_timeout=30))
+    for name in ("one", "two", "three"):
+        job = service.submit(GitHubRepo("grace", name))
+        deadline = time.time() + 30
+        while job.state not in ("done", "error") and time.time() < deadline:
+            time.sleep(0.02)
+        assert job.state == "done", job.error
+    assert service.finished_report("grace", "one") is None
+    assert service.finished_report("grace", "two") and service.finished_report("grace", "three")
+
+
+def test_public_server_health_hosts_and_rate_limit(tmp_path: Path):
+    release = threading.Event()
+    service = _slow_service(tmp_path, Limits(per_client=1), release)
+    server = make_server("127.0.0.1", 0, service, public=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        assert request(base + "/healthz")[:1] == (200,)
+        status, _, page = request(base + "/", headers={"Host": "gitstory.onrender.com"})
+        assert status == 200 and b'"public":true' in page
+        first = request(base + "/api/stories", {"url": "a/one"}, headers={"X-Forwarded-For": "9.9.9.9, 10.0.0.1"})
+        assert first[0] == 202
+        second = request(base + "/api/stories", {"url": "a/two"}, headers={"X-Forwarded-For": "9.9.9.9"})
+        assert second[0] == 429 and "stories every" in json.loads(second[2])["error"]
+        other = request(base + "/api/stories", {"url": "a/two"}, headers={"X-Forwarded-For": "8.8.8.8"})
+        assert other[0] == 202
+    finally:
+        release.set()
+        server.shutdown()
+        server.server_close()
+
+
+def test_local_server_still_checks_the_host(site):
+    base, _ = site
+    assert request(base + "/", headers={"Host": "evil.example"})[0] == 403
