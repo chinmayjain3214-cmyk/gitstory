@@ -430,6 +430,7 @@
         more.textContent = tail;
       });
       more.appendChild(button);
+      more.setAttribute('data-export-text', tail);   // what an image or PDF shows instead of the button
     } else {
       more.textContent = tail;
     }
@@ -1082,15 +1083,13 @@
 
   // ---------------------------------------------------------------- download
 
-  var revealAll = function () {};
-
   var DOWNLOADS = [
     { kind: 'png', title: 'Long image', ext: '.png',
-      text: 'The whole story as one tall picture, ready to share.' },
+      text: 'One tall picture of the whole story, ready to share.' },
     { kind: 'pdf', title: 'PDF', ext: '.pdf',
-      text: 'A4 pages you can print or attach, split between sections.' },
+      text: 'Numbered A4 pages to print or attach, split between sections.' },
     { kind: 'html', title: 'HTML', ext: '.html',
-      text: 'Works offline, anywhere: every chart, the search and the commit history.' }
+      text: 'Works offline, anywhere, with the clickable commit history and search.' }
   ];
 
   var ICONS = {
@@ -1140,7 +1139,7 @@
     });
     menu.appendChild(status);
     menu.appendChild(el('p', { 'class': 'dl-note', text:
-      'The image and PDF show the page as it looks now, so open the commit history first to include it.' }));
+      'The image and PDF leave out the commit history and other buttons, since paper cannot be clicked. The HTML keeps everything.' }));
     append(wrap, [button, menu]);
 
     function open() {
@@ -1148,7 +1147,7 @@
       menu.hidden = false;
       button.setAttribute('aria-expanded', 'true');
       wrap.classList.add('is-open');
-      items[0].focus();
+      items[0].focus({ preventScroll: true });
       document.addEventListener('mousedown', outside, true);
     }
     function close(refocus) {
@@ -1157,7 +1156,7 @@
       button.setAttribute('aria-expanded', 'false');
       wrap.classList.remove('is-open');
       document.removeEventListener('mousedown', outside, true);
-      if (refocus) button.focus();
+      if (refocus) button.focus({ preventScroll: true });
     }
     function outside(event) { if (!wrap.contains(event.target)) close(false); }
 
@@ -1199,7 +1198,7 @@
         wrap.classList.remove('is-busy');
         item.classList.remove('is-working');
         items.forEach(function (other) { other.disabled = false; });
-        item.focus();
+        item.focus({ preventScroll: true });
       });
     }
 
@@ -1241,7 +1240,7 @@
 
   var MAX_SIDE = 32000;          // browsers refuse taller canvases
   var MAX_AREA = 120 * 1000 * 1000;
-  var BREAK_AT = 'h2, h3, p, li, tr, .panel, .tile, .fact, .persona, .commit, .cfile, .history-start, .history-tools, .history-more, .footer';
+  var BREAK_AT = 'h2, h3, p, li, .panel, .tile, .fact, .persona, .footer';
 
   // One painted frame; a timer backs it up because hidden tabs pause animation frames.
   function nextFrame() {
@@ -1253,24 +1252,66 @@
     });
   }
 
+  function each(scope, selector, fn) { Array.prototype.forEach.call(scope.querySelectorAll(selector), fn); }
+
+  // A copy of the story made for paper: every animation at its end, every
+  // contributor shown, and nothing that only works when clicked (the commit
+  // history, "show all" buttons, jump-to-commit links).
+  function printableCopy() {
+    return [document.querySelector('main'), document.querySelector('.footer')].map(function (part) {
+      var copy = part.cloneNode(true);
+      each(copy, '#history, script, .tooltip', function (node) { node.remove(); });
+      each(copy, '.reveal', function (node) { node.classList.add('is-visible'); });
+      each(copy, '.num[data-count]', function (node) {
+        node.textContent = (node.getAttribute('data-prefix') || '') + fmtNum(+node.getAttribute('data-count'));
+      });
+      each(copy, '#tl-clip rect', function (node) { node.setAttribute('width', '100000'); });
+      each(copy, '.people > [hidden]', function (node) { node.removeAttribute('hidden'); });
+      each(copy, '[data-export-text]', function (node) {
+        node.textContent = node.getAttribute('data-export-text');
+        if (!node.textContent) node.remove();
+      });
+      each(copy, 'button.hash-link', function (node) {
+        node.parentNode.replaceChild(el('span', { 'class': 'mono', text: node.textContent }), node);
+      });
+      return copy;
+    });
+  }
+
+  // Lay the copy out off-screen (same width, same media queries) to learn
+  // its height and where pages may be cut, without moving the live page.
+  function measure(parts, width) {
+    var box = el('div', { 'aria-hidden': 'true' });
+    box.setAttribute('style', 'position:fixed;left:0;top:0;width:' + width + 'px;display:flow-root;' +
+      'visibility:hidden;pointer-events:none;z-index:-1');
+    parts.forEach(function (part) { box.appendChild(part); });
+    document.body.appendChild(box);
+    var top = box.getBoundingClientRect().top;
+    var height = Math.ceil(box.getBoundingClientRect().height);
+    var breaks = [0];
+    each(box, BREAK_AT, function (node) {
+      var rect = node.getBoundingClientRect();
+      if (!rect.height) return;                       // not displayed
+      var y = Math.round(rect.top - top);
+      if (y > 0 && y < height) breaks.push(y);
+    });
+    breaks.sort(function (a, b) { return a - b; });
+    box.remove();
+    return { height: height, breaks: breaks };
+  }
+
   function makeSnapshot(say) {
     say('Getting the page ready…');
-    revealAll();
     root.classList.add('is-capturing');
-    return nextFrame().then(nextFrame).then(function () {
+    return nextFrame().then(function () {
       var width = root.clientWidth;
-      var height = Math.ceil(Math.max(document.body.scrollHeight, root.scrollHeight));
-      var breaks = [0];
-      Array.prototype.forEach.call(document.querySelectorAll('main ' + BREAK_AT.split(', ').join(', main ') + ', .footer'), function (node) {
-        if (!node.offsetParent && node.tagName !== 'BODY') return;  // not displayed
-        var y = Math.round(node.getBoundingClientRect().top + window.pageYOffset);
-        if (y > 0 && y < height) breaks.push(y);
-      });
-      breaks.sort(function (a, b) { return a - b; });
-      var source = shotMarkup(width, height);
+      var parts = printableCopy();
+      var layout = measure(parts, width);
+      var source = shotMarkup(parts, width, layout.height);
       root.classList.remove('is-capturing');
       say('Drawing the page…');
       return loadImage(source).then(function (image) {
+        var height = layout.height;
         var scale = Math.min(2, MAX_SIDE / height, Math.sqrt(MAX_AREA / (width * height)));
         var canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.floor(width * scale));
@@ -1279,37 +1320,28 @@
         ctx.fillStyle = cssVar('--bg') || '#0a1020';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        return { canvas: canvas, width: width, height: height, scale: canvas.width / width, breaks: breaks };
+        return { canvas: canvas, width: width, height: height, scale: canvas.width / width, breaks: layout.breaks };
       });
-    }, function (error) { root.classList.remove('is-capturing'); throw error; });
+    }).catch(function (error) { root.classList.remove('is-capturing'); throw error; });
   }
 
   function cssVar(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
 
-  function shotMarkup(width, height) {
+  function shotMarkup(parts, width, height) {
     var css = Array.prototype.map.call(document.querySelectorAll('style'), function (s) { return s.textContent; }).join('\n');
     // Custom properties live on :root, which a copied <body> does not have.
     var vars = {};
     (css.match(/--[\w-]+(?=\s*:)/g) || []).forEach(function (name) { vars[name] = cssVar(name); });
     var inline = Object.keys(vars).map(function (name) { return name + ':' + vars[name]; }).join(';');
 
-    var body = document.body.cloneNode(true);
-    Array.prototype.forEach.call(body.querySelectorAll('script, noscript, .tooltip, .theme-toggle, .report-nav'), function (node) { node.remove(); });
-    Array.prototype.forEach.call(body.querySelectorAll('.reveal'), function (node) { node.classList.add('is-visible'); });
-    Array.prototype.forEach.call(body.querySelectorAll('.num[data-count]'), function (node) {
-      node.textContent = (node.getAttribute('data-prefix') || '') + fmtNum(+node.getAttribute('data-count'));
-    });
-    var clip = body.querySelector('#tl-clip rect');
-    if (clip) clip.setAttribute('width', '100000');
-    // Typed text lives in a property, not an attribute; copy it across.
-    var liveInputs = document.body.querySelectorAll('input'), copies = body.querySelectorAll('input');
-    Array.prototype.forEach.call(copies, function (input, i) { if (liveInputs[i]) input.setAttribute('value', liveInputs[i].value); });
-
+    var body = document.createElement('body');
+    body.className = document.body.className;      // same classes as when measured
     body.setAttribute('data-theme', root.getAttribute('data-theme') || 'dark');
     body.setAttribute('style', inline + ';margin:0;width:' + width + 'px;height:' + height + 'px;overflow:hidden');
     var style = document.createElement('style');
     style.textContent = css + '\n*,*::before,*::after{animation:none!important;transition:none!important}';
-    body.insertBefore(style, body.firstChild);
+    body.appendChild(style);
+    parts.forEach(function (part) { body.appendChild(part); });
 
     var xhtml = new XMLSerializer().serializeToString(body);
     return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
@@ -1342,13 +1374,14 @@
 
   // ---- PDF: the drawing cut into A4 pages, each page one JPEG.
   var A4 = { w: 595.28, h: 841.89 };
+  var PAGE_FOOTER = 40;                // CSS pixels kept free at the bottom of each page
 
   function pageSlices(shot) {
     var pageHeight = Math.floor(shot.width * A4.h / A4.w);
     var pad = 28;                      // breathing room above the content on later pages
     var slices = [], y = 0;
     while (y < shot.height - 2) {
-      var room = pageHeight - (slices.length ? pad : 0);
+      var room = pageHeight - (slices.length ? pad : 0) - PAGE_FOOTER;
       var end = y + room;
       if (end >= shot.height) { end = shot.height; }
       else {
@@ -1384,6 +1417,7 @@
         ctx.fillRect(0, 0, page.width, page.height);
         var sy = Math.round(slice.top * scale), sh = Math.round(slice.height * scale);
         ctx.drawImage(shot.canvas, 0, sy, shot.canvas.width, sh, 0, Math.round(slice.pad * scale), page.width, sh);
+        pageFooter(ctx, scale, shot.width, slice.pageHeight, i + 1, slices.length);
         return toBlob(page, 'image/jpeg', 0.9).then(function (blob) { return blob.arrayBuffer(); }).then(function (buffer) {
           pages.push({ bytes: new Uint8Array(buffer), width: page.width, height: page.height });
         });
@@ -1393,6 +1427,27 @@
       say('Saving the PDF…');
       saveBlob(buildPdf(pages, DATA.repo_name + ' · gitstory'), name);
     });
+  }
+
+  // "repo · gitstory" on the left, "Page 2 of 5" on the right, in the margin of the drawing.
+  function pageFooter(ctx, scale, width, height, number, total) {
+    var gutter = parseFloat(cssVar('--gutter')) || 40;
+    var y = (height - PAGE_FOOTER / 2) * scale;
+    ctx.save();
+    ctx.scale(scale, scale);
+    ctx.font = '12px ' + (cssVar('--sans') || 'sans-serif');
+    ctx.fillStyle = cssVar('--muted') || '#8d97b5';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = cssVar('--line') || 'rgba(160,176,224,0.16)';
+    ctx.beginPath();
+    ctx.moveTo(gutter, height - PAGE_FOOTER + 6);
+    ctx.lineTo(width - gutter, height - PAGE_FOOTER + 6);
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.fillText(DATA.repo_name + ' · gitstory', gutter, y / scale);
+    ctx.textAlign = 'right';
+    ctx.fillText('Page ' + number + ' of ' + total, width - gutter, y / scale);
+    ctx.restore();
   }
 
   function pdfText(text) {
@@ -1448,7 +1503,6 @@
       section.classList.add('is-visible');
       if (hooks[section.id]) hooks[section.id]();
     }
-    revealAll = function () { sections.forEach(show); };
     if (reduceMotion || !('IntersectionObserver' in window)) { sections.forEach(show); return; }
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
