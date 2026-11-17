@@ -113,8 +113,9 @@ gitstory --serve
 gitstory --serve --open              # also open it in your browser
 gitstory --serve --port 9000         # another port (0 picks any free one)
 
-# Also available as a module
+# Also available as a module (use this if Windows security policy blocks gitstory.exe)
 python -m gitstory . -o report.html
+python -m gitstory --serve --open
 
 gitstory --version
 gitstory --help
