@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{THEME}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="gitstory">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="Paste a GitHub link and get an animated story of the repository's history.">
+<title>{{TITLE}}</title>
+<style>
+{{CSS}}
+</style>
+</head>
+<body class="home">
+<button class="theme-toggle" id="theme-toggle" type="button">Light theme</button>
+
+<main class="story">
+  <header class="hero home-hero">
+    <p class="hero-kicker">Every repository has a story</p>
+    <h1 class="hero-title">git<span class="gradient-text">story</span></h1>
+    <p class="hero-lede">Paste a GitHub link and watch its history become an animated story: who built it, when the code gets written, which files never sit still, and the moments worth remembering.</p>
+
+    <div class="launch" id="launch">
+      <form class="step-panel" id="step-form" novalidate>
+        <label class="launch-label" for="repo-input">GitHub repository link</label>
+        <div class="input-row">
+          <input class="repo-input" id="repo-input" name="url" type="text" inputmode="url"
+                 autocomplete="off" autocapitalize="off" spellcheck="false"
+                 placeholder="https://github.com/owner/repository" aria-describedby="form-error form-hint">
+          <button class="btn btn-primary" id="form-submit" type="submit">Continue</button>
+        </div>
+        <p class="form-error" id="form-error" role="alert" hidden></p>
+        <p class="form-hint" id="form-hint">Public repositories work out of the box. <span class="examples" id="examples"></span></p>
+      </form>
+
+      <section class="step-panel" id="step-confirm" hidden aria-labelledby="confirm-title">
+        <p class="launch-label" id="confirm-title">Tell the story of</p>
+        <p class="confirm-repo"><span class="confirm-owner" id="confirm-owner"></span><strong id="confirm-name"></strong></p>
+        <a class="confirm-link" id="confirm-link" target="_blank" rel="noopener noreferrer">Check it on GitHub ↗</a>
+        <p class="confirm-note">gitstory will download this repository's history into a temporary folder on this computer, read it, and delete the copy afterwards. Large projects can take a minute or two.</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="confirm-go" type="button">Confirm and build the story</button>
+          <button class="btn btn-ghost" id="confirm-back" type="button">Change link</button>
+        </div>
+      </section>
+
+      <section class="step-panel" id="step-progress" hidden aria-labelledby="progress-title">
+        <p class="launch-label" id="progress-title">Building the story of <strong id="progress-repo"></strong></p>
+        <ol class="steps" aria-live="polite">
+          <li class="step" data-step="0">
+            <span class="step-dot" aria-hidden="true"></span>
+            <div class="step-body">
+              <span class="step-title">Downloading the history</span>
+              <span class="step-detail" id="clone-detail"></span>
+              <span class="meter" aria-hidden="true"><i id="clone-meter"></i></span>
+            </div>
+          </li>
+          <li class="step" data-step="1">
+            <span class="step-dot" aria-hidden="true"></span>
+            <div class="step-body"><span class="step-title">Reading every commit</span></div>
+          </li>
+          <li class="step" data-step="2">
+            <span class="step-dot" aria-hidden="true"></span>
+            <div class="step-body"><span class="step-title">Drawing the story</span></div>
+          </li>
+        </ol>
+        <p class="elapsed" id="elapsed"></p>
+      </section>
+
+      <section class="step-panel" id="step-error" hidden role="alert" aria-labelledby="error-title">
+        <p class="launch-label" id="error-title">That didn't work</p>
+        <p class="failure-text" id="failure-text"></p>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="error-retry" type="button">Try again</button>
+          <button class="btn btn-ghost" id="error-back" type="button">Use another link</button>
+        </div>
+      </section>
+    </div>
+  </header>
+
+  <section class="chapter reveal" id="inside" aria-labelledby="inside-title">
+    <h2 class="chapter-title" id="inside-title">What's in a story</h2>
+    <p class="chapter-lede">Seven chapters, all drawn from the repository's own commits. Every chart animates in as you scroll.</p>
+    <ol class="features">
+      <li class="feature"><div class="feature-art" data-art="hero"></div>
+        <h3 class="feature-title">The headline numbers</h3>
+        <p class="feature-text">First and latest commit, total commits, contributors, lines added and removed, and the project's age, counting up as the page opens.</p></li>
+      <li class="feature"><div class="feature-art" data-art="timeline"></div>
+        <h3 class="feature-title">Animated timeline</h3>
+        <p class="feature-text">Commits per week, drawn left to right. Hover any week to see its busiest moment.</p></li>
+      <li class="feature"><div class="feature-art" data-art="people"></div>
+        <h3 class="feature-title">Contributors</h3>
+        <p class="feature-text">Everyone who shaped the project, ranked, with their lines changed, active dates and an activity sparkline.</p></li>
+      <li class="feature"><div class="feature-art" data-art="heatmap"></div>
+        <h3 class="feature-title">When the code gets written</h3>
+        <p class="feature-text">A day-by-hour heatmap and a verdict: night owls, early birds, 9-to-5ers or weekend warriors.</p></li>
+      <li class="feature"><div class="feature-art" data-art="churn"></div>
+        <h3 class="feature-title">File churn</h3>
+        <p class="feature-text">The fifteen files that change the most, and the languages doing the heavy lifting.</p></li>
+      <li class="feature"><div class="feature-art" data-art="words"></div>
+        <h3 class="feature-title">Commit messages</h3>
+        <p class="feature-text">Average length, favourite words, how often <code>feat:</code> and <code>fix:</code> show up, and the longest and shortest messages.</p></li>
+      <li class="feature"><div class="feature-art" data-art="facts"></div>
+        <h3 class="feature-title">Fun facts</h3>
+        <p class="feature-text">The biggest single commit, the longest streak, the longest silence and the busiest day ever.</p></li>
+    </ol>
+  </section>
+
+  <section class="chapter reveal" id="how" aria-labelledby="how-title">
+    <h2 class="chapter-title" id="how-title">How it works</h2>
+    <ol class="how">
+      <li class="how-step"><span class="how-num">1</span>
+        <div><h3 class="feature-title">Paste a link</h3>
+        <p class="feature-text">Any GitHub repository link works, even one to a file or a branch. <code>owner/repo</code> is fine too.</p></div></li>
+      <li class="how-step"><span class="how-num">2</span>
+        <div><h3 class="feature-title">gitstory reads the history</h3>
+        <p class="feature-text">It clones the default branch with <code>git</code>, reads every commit with <code>git log</code>, and works out the numbers.</p></div></li>
+      <li class="how-step"><span class="how-num">3</span>
+        <div><h3 class="feature-title">Read it, keep it, share it</h3>
+        <p class="feature-text">The story opens right here. Download it as one HTML file that works offline, with no account needed.</p></div></li>
+    </ol>
+    <p class="privacy">🔒 Everything runs on this computer. The copy of the repository is deleted as soon as it has been read, and nothing is uploaded anywhere.</p>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>Generated by <strong>gitstory</strong> {{VERSION}}. Also works from the command line: <code>gitstory /path/to/repo</code> or <code>gitstory https://github.com/owner/repo</code>.</p>
+</footer>
+
+<script id="gitstory-data" type="application/json">{{DATA}}</script>
+<script>
+{{JS}}
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{THEME}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="gitstory">
+<meta name="color-scheme" content="dark light">
+<title>{{TITLE}}</title>
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="theme-toggle" type="button">Light theme</button>
+<nav class="report-nav" id="report-nav" aria-label="gitstory" hidden></nav>
+
+<main class="story">
+  <header class="hero">
+    <p class="hero-kicker">The story of</p>
+    <h1 class="hero-title" id="repo-name"></h1>
+    <a class="hero-source" id="hero-source" target="_blank" rel="noopener noreferrer" hidden></a>
+    <p class="hero-lede" id="hero-lede"></p>
+    <div class="hero-diffstat" id="hero-diffstat"></div>
+    <p class="hero-filters" id="hero-filters" hidden></p>
+  </header>
+
+  <section class="chapter reveal" id="timeline" aria-labelledby="timeline-title">
+    <h2 class="chapter-title" id="timeline-title">Timeline</h2>
+    <p class="chapter-lede" id="timeline-lede"></p>
+    <div class="panel">
+      <div class="timeline-chart" id="timeline-chart"></div>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="contributors" aria-labelledby="contributors-title">
+    <h2 class="chapter-title" id="contributors-title">Contributors</h2>
+    <p class="chapter-lede" id="contributors-lede"></p>
+    <ol class="people" id="people"></ol>
+    <div class="people-more" id="people-more"></div>
+  </section>
+
+  <section class="chapter reveal" id="rhythm" aria-labelledby="rhythm-title">
+    <h2 class="chapter-title" id="rhythm-title">When the code gets written</h2>
+    <p class="chapter-lede" id="rhythm-lede"></p>
+    <div class="rhythm">
+      <div class="panel">
+        <div class="heatmap" id="heatmap"></div>
+        <div class="heatmap-legend" id="heatmap-legend"></div>
+      </div>
+      <aside class="persona" id="persona"></aside>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="churn" aria-labelledby="churn-title">
+    <h2 class="chapter-title" id="churn-title">File churn</h2>
+    <p class="chapter-lede" id="churn-lede"></p>
+    <div class="churn">
+      <div class="panel">
+        <h3 class="panel-title">Most-changed files</h3>
+        <div class="legend" id="churn-legend"></div>
+        <ol class="bars" id="churn-files"></ol>
+      </div>
+      <div class="panel">
+        <h3 class="panel-title">Languages by lines changed</h3>
+        <ol class="bars" id="churn-extensions"></ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="history" aria-labelledby="history-title" hidden>
+    <h2 class="chapter-title" id="history-title">Commit history</h2>
+    <p class="chapter-lede">Every commit, newest first. Open one to see the files it changed and how often each of those files has changed over the life of the project.</p>
+    <div class="history-start" id="history-start">
+      <button class="history-open" id="history-open" type="button" aria-controls="history-browser" aria-expanded="false">
+        <span class="history-open-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="9" r="2.2"/><path d="M6 7.2v9.6M18 11.2c0 3.6-4.5 3.2-10.4 6.6"/></svg>
+        </span>
+        <span class="history-open-text">
+          <strong>Commit history</strong>
+          <small id="history-open-hint"></small>
+        </span>
+        <span class="history-open-arrow" aria-hidden="true">→</span>
+      </button>
+    </div>
+    <div class="history-browser" id="history-browser" hidden>
+      <div class="history-tools">
+        <label class="visually-hidden" for="history-search">Search commits</label>
+        <input class="history-search" id="history-search" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Search messages, authors, hashes or file names">
+        <div class="history-types" id="history-types" role="group" aria-label="Filter by commit type"></div>
+      </div>
+      <div class="history-file-filter" id="history-file-filter" hidden></div>
+      <p class="history-status" id="history-status" role="status" aria-live="polite"></p>
+      <ol class="commits" id="commit-list" tabindex="-1" aria-labelledby="history-title"></ol>
+      <div class="history-more">
+        <button class="history-more-button" id="history-more" type="button">Load 10 more</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="messages" aria-labelledby="messages-title">
+    <h2 class="chapter-title" id="messages-title">Commit message insights</h2>
+    <p class="chapter-lede" id="messages-lede"></p>
+    <div class="tiles" id="message-tiles"></div>
+    <div class="messages">
+      <div class="panel">
+        <h3 class="panel-title">Most common words</h3>
+        <ol class="bars" id="message-words"></ol>
+      </div>
+      <div class="quotes" id="message-quotes"></div>
+    </div>
+  </section>
+
+  <section class="chapter reveal" id="facts" aria-labelledby="facts-title">
+    <h2 class="chapter-title" id="facts-title">Fun facts</h2>
+    <div class="facts" id="fact-cards"></div>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>Generated by <strong>gitstory</strong><span id="footer-meta"></span></p>
+</footer>
+
+<div class="tooltip" id="tooltip" role="status" aria-live="polite" hidden></div>
+<noscript><p class="noscript">This report draws its charts with JavaScript. Enable JavaScript to see it.</p></noscript>
+
+<script id="gitstory-data" type="application/json">{{DATA}}</script>
+<script>
+{{JS}}
+</script>
+</body>
+</html>
