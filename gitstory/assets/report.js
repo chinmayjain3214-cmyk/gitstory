@@ -557,6 +557,387 @@
     }
   }
 
+  // ---------------------------------------------------------------- commit history
+
+  function ordinal(n) {
+    var v = n % 100;
+    var suffix = (v >= 11 && v <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+    return fmtNum(n) + suffix;
+  }
+
+  function fmtTime(iso) {
+    var offset = (iso.match(/([+-]\d\d:\d\d)$/) || [])[1];
+    var zone = !offset || offset === '+00:00' || offset === '-00:00' ? 'UTC' : 'UTC' + offset;
+    return iso.slice(11, 16) + ' ' + zone;
+  }
+
+  function splitPath(path) {
+    var slash = path.lastIndexOf('/');
+    return [
+      slash >= 0 ? el('span', { 'class': 'path-dir', text: path.slice(0, slash + 1) }) : null,
+      el('span', { 'class': 'path-name', text: path.slice(slash + 1) })
+    ];
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).catch(function () { return legacyCopy(text); });
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+  function legacyCopy(text) {
+    var area = el('textarea', { readonly: 'readonly', style: 'position:fixed;top:-100px;opacity:0' });
+    area.value = text;
+    document.body.appendChild(area);
+    area.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(area);
+    if (!ok) throw new Error('copy failed');
+  }
+
+  var STATUS_LABEL = { A: 'New', D: 'Deleted', R: 'Renamed', M: 'Changed' };
+  var PAGE = 10;
+
+  // Returns a function other chapters can call to jump to a commit by hash,
+  // or null when the report has no history.
+  function renderHistory() {
+    var H = DATA.history;
+    if (!H || !H.commits || !H.commits.length) return null;
+    var section = byId('history');
+    section.hidden = false;
+
+    var source = DATA.meta && DATA.meta.source;
+    var githubBase = source && /^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(source.url) ? source.url : null;
+
+    var commits = H.commits.map(function (row, index) {
+      var author = H.authors[row[3]];
+      return {
+        index: index, hash: row[0], subject: row[1], body: row[2],
+        author: author[0], initials: author[1], color: author[2],
+        when: row[4], type: row[5], merge: !!row[6], number: row[7], authorNumber: row[8],
+        sincePrevious: row[9], added: row[10], removed: row[11], filesTotal: row[12],
+        files: row[13].map(function (f) {
+          return {
+            path: H.paths[f[0]], oldPath: f[1] >= 0 ? H.paths[f[1]] : null, status: f[2],
+            added: f[3], removed: f[4], binary: !!f[5], lineage: f[6], touch: f[7], touches: f[8]
+          };
+        }),
+        haystack: null
+      };
+    });
+    var total = commits.length;
+
+    var state = { query: '', type: '', lineage: 0, shown: 0, matches: commits };
+    var list = byId('commit-list');
+    var status = byId('history-status');
+    var more = byId('history-more');
+    var search = byId('history-search');
+    var fileFilter = byId('history-file-filter');
+    var browser = byId('history-browser');
+    var opener = byId('history-open');
+
+    byId('history-open-hint').textContent = total > PAGE
+      ? 'Start with the latest ' + PAGE + ' of ' + count(H.total, 'commit', 'commits') + ', then load more'
+      : 'See all ' + count(total, 'commit', 'commits') + ', newest first';
+
+    // ---- filters
+
+    var typeCounts = {}, merges = 0;
+    commits.forEach(function (c) {
+      if (c.merge) merges++;
+      if (c.type) typeCounts[c.type] = (typeCounts[c.type] || 0) + 1;
+    });
+    var types = Object.keys(typeCounts).sort(function (a, b) { return typeCounts[b] - typeCounts[a] || (a < b ? -1 : 1); }).slice(0, 6);
+    var typeHost = byId('history-types');
+    var typeButtons = [];
+    function typeButton(value, label, n) {
+      var button = el('button', { type: 'button', 'class': 'type-filter', 'aria-pressed': value === state.type ? 'true' : 'false' }, [label, el('b', { text: fmtNum(n) })]);
+      button.addEventListener('click', function () { state.type = state.type === value && value ? '' : value; refresh(true); });
+      button._value = value;
+      typeButtons.push(button);
+      typeHost.appendChild(button);
+    }
+    if (types.length || merges) {
+      typeButton('', 'All', total);
+      types.forEach(function (t) { typeButton(t, t, typeCounts[t]); });
+      if (merges) typeButton(':merge', 'Merges', merges);
+    }
+
+    function haystack(c) {
+      if (c.haystack === null) {
+        c.haystack = [c.subject, c.body, c.author, c.hash].concat(
+          c.files.map(function (f) { return f.path + ' ' + (f.oldPath || ''); })
+        ).join('\n').toLowerCase();
+      }
+      return c.haystack;
+    }
+
+    function matches(c) {
+      if (state.type === ':merge' && !c.merge) return false;
+      if (state.type && state.type !== ':merge' && c.type !== state.type) return false;
+      if (state.lineage && !c.files.some(function (f) { return f.lineage === state.lineage; })) return false;
+      if (!state.query) return true;
+      var text = haystack(c);
+      return state.query.split(/\s+/).every(function (word) { return text.indexOf(word) >= 0; });
+    }
+
+    // ---- rendering
+
+    function factChip(text, milestone) {
+      return el('span', { 'class': 'commit-fact' + (milestone ? ' is-milestone' : ''), text: text });
+    }
+
+    function fileRow(f, j, maxLines) {
+      var lines = f.added + f.removed;
+      var label = f.binary ? 'Binary' : STATUS_LABEL[f.status];
+      var statusClass = f.binary && f.status === 'M' ? 'M' : f.status;
+      var history;
+      if (f.touches <= 1) {
+        history = el('span', { 'class': 'cfile-history', title: 'No other commit changed this file', text: 'Only change' });
+      } else {
+        history = el('button', {
+          type: 'button', 'class': 'cfile-history',
+          title: 'Show every commit that changed this file',
+          'aria-label': 'Change ' + f.touch + ' of ' + f.touches + ' to ' + f.path + '. Show every commit that changed it.',
+          text: 'Change ' + fmtNum(f.touch) + ' of ' + fmtNum(f.touches) + ' ↗'
+        });
+        history.addEventListener('click', function (event) {
+          event.stopPropagation();
+          showFileHistory(f.lineage, f.path);
+        });
+      }
+      return el('li', { 'class': 'cfile' + (state.lineage && f.lineage === state.lineage ? ' is-followed' : ''), style: '--j:' + Math.min(j, 20) }, [
+        el('span', { 'class': 'cfile-status s-' + statusClass, text: label }),
+        el('div', { 'class': 'cfile-path', title: f.path }, splitPath(f.path).concat([
+          f.oldPath ? el('small', { text: 'renamed from ' + f.oldPath }) : null
+        ])),
+        el('span', { 'class': 'cfile-lines', text: f.binary ? 'binary' : '+' + fmtNum(f.added) + ' −' + fmtNum(f.removed) }),
+        lines ? el('span', { 'class': 'cfile-bar', 'aria-hidden': 'true', style: 'width:' + Math.max(2, lines / maxLines * 100).toFixed(1) + '%' }, [
+          f.added ? el('i', { 'class': 'is-added', style: 'flex:' + f.added }) : null,
+          f.removed ? el('i', { 'class': 'is-removed', style: 'flex:' + f.removed }) : null
+        ]) : null,
+        history
+      ]);
+    }
+
+    function details(c) {
+      var facts = [
+        factChip('Commit ' + fmtNum(c.number) + ' of ' + fmtNum(H.total)),
+        c.number === 1 ? factChip('🌱 The very first commit', true) : null,
+        c.authorNumber === 1
+          ? factChip('🎉 ' + c.author + "'s first commit", true)
+          : factChip(c.author + "'s " + ordinal(c.authorNumber) + ' commit'),
+        factChip(weekdayName(c.when) + ', ' + fmtTime(c.when)),
+        c.sincePrevious >= 0
+          ? factChip(c.sincePrevious < 60 ? 'Right after the previous commit' : fmtDuration(c.sincePrevious) + ' after the previous commit')
+          : null
+      ];
+
+      var body = c.body ? el('pre', { 'class': 'commit-body', text: c.body }) : null;
+
+      var filesBlock;
+      if (!c.files.length) {
+        filesBlock = el('p', { 'class': 'cfiles-note', text: c.merge
+          ? 'Merge commits do not list file changes; the changes show up on the commits that were merged.'
+          : 'This commit did not change any files.' });
+      } else {
+        var maxLines = Math.max.apply(null, c.files.map(function (f) { return f.added + f.removed; }).concat([1]));
+        var counts = { A: 0, D: 0, R: 0 };
+        c.files.forEach(function (f) { if (counts[f.status] != null) counts[f.status]++; });
+        var summary = [
+          counts.A ? fmtNum(counts.A) + ' new' : null,
+          counts.D ? fmtNum(counts.D) + ' deleted' : null,
+          counts.R ? fmtNum(counts.R) + ' renamed' : null
+        ].filter(Boolean).join(' · ');
+        filesBlock = [
+          el('div', { 'class': 'cfiles-title' }, [
+            'Files changed (' + fmtNum(c.filesTotal) + ')',
+            summary ? el('small', { text: summary }) : null
+          ]),
+          el('ul', { 'class': 'cfiles' }, c.files.map(function (f, j) { return fileRow(f, j, maxLines); })),
+          c.filesTotal > c.files.length
+            ? el('p', { 'class': 'cfiles-more', text: 'Plus ' + count(c.filesTotal - c.files.length, 'smaller change', 'smaller changes') + ' not listed here.' })
+            : null
+        ];
+      }
+
+      var copy = el('button', { type: 'button', title: 'Copy the full commit hash' }, [
+        el('span', { 'class': 'mono', text: c.hash.slice(0, 10) }), el('span', { text: 'Copy hash' })
+      ]);
+      copy.addEventListener('click', function () {
+        var label = copy.lastChild;
+        copyText(c.hash).then(function () { label.textContent = 'Copied ✓'; }, function () { label.textContent = 'Copy failed'; })
+          .then(function () { setTimeout(function () { label.textContent = 'Copy hash'; }, 1600); });
+      });
+      var actions = el('div', { 'class': 'commit-actions' }, [
+        copy,
+        githubBase ? el('a', { href: githubBase + '/commit/' + c.hash, target: '_blank', rel: 'noopener noreferrer', text: 'View on GitHub ↗' }) : null
+      ]);
+
+      return el('div', { 'class': 'commit-details-body' }, [
+        el('div', { 'class': 'commit-facts' }, facts), body
+      ].concat(filesBlock).concat([actions]));
+    }
+
+    function card(c, i) {
+      var id = 'commit-' + c.hash.slice(0, 12);
+      var item = el('li', { 'class': 'commit is-entering' + (c.merge ? ' is-merge' : ''), id: id, style: '--i:' + i });
+      var tag = c.merge ? el('span', { 'class': 'type-tag t-merge', text: 'merge' })
+        : (c.type ? el('span', { 'class': 'type-tag t-' + c.type, text: c.type }) : null);
+      var lines = c.added + c.removed;
+      var head = el('button', { type: 'button', 'class': 'commit-head', 'aria-expanded': 'false', 'aria-controls': id + '-details' }, [
+        el('span', { 'class': 'avatar is-small', style: 'background:' + c.color, 'aria-hidden': 'true', text: c.initials }),
+        el('span', { 'class': 'commit-main' }, [
+          el('span', { 'class': 'commit-subject' }, [tag, el('span', { 'class': 'commit-subject-text', text: c.subject || '(empty message)' })]),
+          el('span', { 'class': 'commit-meta', style: 'display:block', text: c.author + ' · ' + fmtDay(c.when) + ', ' + c.when.slice(11, 16) + ' · ' + c.hash.slice(0, 7) })
+        ]),
+        c.merge && !c.filesTotal ? el('span', { 'class': 'commit-side' }, el('span', { 'class': 'commit-files' }, [
+          'merged branch', el('span', { 'class': 'commit-chevron', 'aria-hidden': 'true', text: '▾' })
+        ])) : el('span', { 'class': 'commit-side' }, [
+          el('span', { 'class': 'commit-diff' }, [
+            el('span', { 'class': 'add', text: '+' + fmtNum(c.added) }),
+            el('span', { 'class': 'del', text: '−' + fmtNum(c.removed) })
+          ]),
+          lines ? el('span', { 'class': 'diffbar', 'aria-hidden': 'true' }, [
+            c.added ? el('i', { 'class': 'is-added', style: 'flex:' + c.added }) : null,
+            c.removed ? el('i', { 'class': 'is-removed', style: 'flex:' + c.removed }) : null
+          ]) : null,
+          el('span', { 'class': 'commit-files' }, [
+            count(c.filesTotal, 'file', 'files'),
+            el('span', { 'class': 'commit-chevron', 'aria-hidden': 'true', text: '▾' })
+          ])
+        ])
+      ]);
+      var inner = el('div', { 'class': 'commit-details-inner' });
+      var panel = el('div', { 'class': 'commit-details', id: id + '-details', role: 'region', 'aria-label': 'Changes in ' + c.hash.slice(0, 7) }, inner);
+      head.addEventListener('click', function () { toggle(item, head, inner, c); });
+      item.addEventListener('animationend', function (event) {
+        if (event.target === item) item.classList.remove('is-entering');
+      });
+      return append(item, el('article', { 'class': 'commit-card' }, [head, panel]));
+    }
+
+    function toggle(item, head, inner, c, forceOpen) {
+      var open = forceOpen != null ? forceOpen : !item.classList.contains('is-open');
+      if (open && !inner.firstChild) inner.appendChild(details(c)); // built on first open only
+      item.classList.toggle('is-open', open);
+      head.setAttribute('aria-expanded', String(open));
+    }
+
+    function updateStatus() {
+      var n = state.matches.length;
+      var filtered = state.query || state.type || state.lineage;
+      var text;
+      if (!n) text = 'No commits match.';
+      else if (filtered) text = 'Showing ' + fmtNum(state.shown) + ' of ' + count(n, 'matching commit', 'matching commits') + '.';
+      else text = 'Showing ' + fmtNum(state.shown) + ' of ' + count(n, 'commit', 'commits') + ', newest first.';
+      if (H.total > total && !filtered) text += ' This report includes the newest ' + fmtNum(total) + ' of ' + fmtNum(H.total) + '.';
+      status.textContent = text;
+      var left = n - state.shown;
+      more.parentNode.hidden = left <= 0;
+      more.textContent = '';
+      append(more, ['Load ' + Math.min(PAGE, left) + ' more', el('small', { text: '(' + fmtNum(left) + ' left)' })]);
+      typeButtons.forEach(function (b) { b.setAttribute('aria-pressed', String(b._value === state.type)); });
+    }
+
+    function showMore(focusFirst) {
+      var next = state.matches.slice(state.shown, state.shown + PAGE);
+      var first = null;
+      next.forEach(function (c, i) {
+        var node = card(c, i);
+        if (!first) first = node;
+        list.appendChild(node);
+      });
+      state.shown += next.length;
+      updateStatus();
+      if (focusFirst && first) first.querySelector('.commit-head').focus({ preventScroll: true });
+    }
+
+    function refresh(reset) {
+      state.matches = commits.filter(matches);
+      if (reset) {
+        list.textContent = '';
+        state.shown = 0;
+        showMore(false);
+      } else {
+        updateStatus();
+      }
+    }
+
+    function showFileHistory(lineage, path) {
+      state.lineage = lineage;
+      // Name the file by its newest name, from the most recent commit that touched it.
+      var latest = path;
+      for (var i = 0; i < commits.length; i++) {
+        var hit = commits[i].files.filter(function (f) { return f.lineage === lineage; })[0];
+        if (hit) { latest = hit.path; break; }
+      }
+      fileFilter.textContent = '';
+      append(fileFilter, [
+        el('span', null, ['Every commit that changed ', el('span', { 'class': 'mono', text: latest })]),
+        (function () {
+          var clear = el('button', { type: 'button', text: 'Show all commits ✕' });
+          clear.addEventListener('click', function () { state.lineage = 0; fileFilter.hidden = true; refresh(true); });
+          return clear;
+        })()
+      ]);
+      fileFilter.hidden = false;
+      refresh(true);
+      section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    }
+
+    var debounce = null;
+    search.addEventListener('input', function () {
+      clearTimeout(debounce);
+      debounce = setTimeout(function () {
+        state.query = search.value.trim().toLowerCase();
+        refresh(true);
+      }, 150);
+    });
+
+    more.addEventListener('click', function (event) { showMore(event.detail === 0); });
+
+    function open() {
+      if (!browser.hidden) return;
+      byId('history-start').hidden = true;
+      opener.setAttribute('aria-expanded', 'true');
+      browser.hidden = false;
+      if (!reduceMotion) browser.classList.add('is-entering');
+      refresh(true);
+      list.focus({ preventScroll: true });
+    }
+    opener.addEventListener('click', open);
+
+    // Used by other chapters: open the history on one commit.
+    return function jumpTo(hashPrefix) {
+      open();
+      state.query = hashPrefix.toLowerCase();
+      state.type = '';
+      state.lineage = 0;
+      fileFilter.hidden = true;
+      search.value = hashPrefix;
+      refresh(true);
+      var item = list.firstChild;
+      if (item) {
+        toggle(item, item.querySelector('.commit-head'), item.querySelector('.commit-details-inner'),
+          state.matches[0], true);
+        item.classList.add('is-flash');
+      }
+      section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    };
+  }
+
+  var jumpToCommit = null;
+
+  // A short hash that opens the commit in the history chapter, when there is one.
+  function hashRef(hash) {
+    if (!jumpToCommit) return el('span', { 'class': 'mono', text: hash });
+    var button = el('button', { type: 'button', 'class': 'hash-link', title: 'Open this commit in the commit history', text: hash });
+    button.addEventListener('click', function () { jumpToCommit(hash); });
+    return button;
+  }
+
   // ---------------------------------------------------------------- messages
 
   function tile(value, unit, label, extra) {
@@ -571,7 +952,7 @@
     return el('figure', { 'class': 'quote', style: 'margin:0' }, [
       el('div', { 'class': 'quote-kind', text: kind + ', ' + count(ref.length, 'character', 'characters') }),
       el('blockquote', { 'class': 'quote-text', style: 'margin-left:0;margin-right:0', text: ref.text || '(empty message)' }),
-      el('figcaption', { 'class': 'quote-meta' }, [ref.author + ', ' + fmtDay(ref.when) + ', ', el('span', { 'class': 'mono', text: ref.hash })])
+      el('figcaption', { 'class': 'quote-meta' }, [ref.author + ', ' + fmtDay(ref.when) + ', ', hashRef(ref.hash)])
     ]);
   }
 
@@ -627,7 +1008,7 @@
         count(big.lines_added + big.lines_removed, 'line', 'lines'), [
           el('q', { text: big.subject || '(empty message)' }),
           ' by ' + big.author + ' on ' + fmtDay(big.when) + ', touching ' + count(big.files, 'file', 'files') + ' (',
-          el('span', { 'class': 'mono', text: big.hash }), ').'
+          hashRef(big.hash), ').'
         ]));
     }
     var streak = f.longest_streak;
@@ -713,6 +1094,7 @@
   renderContributors();
   renderHeatmap();
   renderChurn();
+  jumpToCommit = renderHistory();
   renderMessages();
   renderFacts();
   renderFooter();

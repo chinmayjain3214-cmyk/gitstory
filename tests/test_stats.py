@@ -344,3 +344,85 @@ def test_commits_without_any_file_changes():
 def test_empty_history_is_rejected():
     with pytest.raises(ValueError):
         build_report([], "nothing")
+
+
+# --------------------------------------------------------------------------
+# Commit history
+# --------------------------------------------------------------------------
+
+from gitstory.stats import commit_history  # noqa: E402
+
+
+def _history_sample():
+    return [
+        make_commit(at(2024, 1, 1, 9), "feat: start", [("app.py", 10, 0), ("README.md", 3, 0)]),
+        make_commit(at(2024, 1, 2, 9), "Rename the app", [("main.py", 0, 0, "app.py")], name="Grace", email="grace@example.com"),
+        make_commit(at(2024, 1, 5, 9), "fix: crash\n\nLonger explanation.", [("main.py", 4, 2)]),
+        make_commit(at(2024, 1, 5, 10), "Merge branch 'x'", [], parents=("a" * 40, "b" * 40)),
+    ]
+
+
+def test_commit_history_is_newest_first_with_numbers():
+    history = commit_history(_history_sample())
+    assert history.total == 4
+    assert [e.subject for e in history.entries] == ["Merge branch 'x'", "fix: crash", "Rename the app", "feat: start"]
+    assert [e.number for e in history.entries] == [4, 3, 2, 1]
+    newest, fix, rename, first = history.entries
+    assert newest.merge and newest.files == [] and newest.since_previous == 3600
+    assert first.since_previous is None and first.type == "feat"
+    assert fix.body == "Longer explanation." and fix.type == "fix"
+    assert (fix.author, fix.author_number) == ("Ada Lovelace", 2)
+    assert (rename.author, rename.author_number, rename.initials) == ("Grace", 1, "GR")
+    assert rename.color == avatar_color("grace@example.com")
+
+
+def test_commit_history_follows_files_through_renames():
+    entries = {e.subject: e for e in commit_history(_history_sample()).entries}
+    app = next(f for f in entries["feat: start"].files if f.path == "app.py")
+    renamed = entries["Rename the app"].files[0]
+    fixed = entries["fix: crash"].files[0]
+    assert renamed.old_path == "app.py" and renamed.status == "renamed"
+    assert app.lineage == renamed.lineage == fixed.lineage
+    assert (app.touch, renamed.touch, fixed.touch) == (1, 2, 3)
+    assert app.touches == renamed.touches == fixed.touches == 3
+    readme = next(f for f in entries["feat: start"].files if f.path == "README.md")
+    assert readme.lineage != app.lineage and (readme.touch, readme.touches) == (1, 1)
+
+
+def test_commit_history_lists_biggest_files_first_and_caps_them():
+    files = [(f"f{i}.txt", i, 0) for i in range(1, 8)]
+    entry = commit_history([make_commit(at(2024, 1, 1), "many", files)], max_files=3).entries[0]
+    assert [f.path for f in entry.files] == ["f7.txt", "f6.txt", "f5.txt"]
+    assert entry.files_total == 7
+
+
+def test_commit_history_keeps_the_newest_commits_but_counts_from_the_first():
+    commits = [make_commit(at(2024, 1, d), f"c{d}") for d in range(1, 6)]
+    history = commit_history(commits, max_commits=2)
+    assert history.total == 5
+    assert [(e.subject, e.number) for e in history.entries] == [("c5", 5), ("c4", 4)]
+
+
+def test_commit_history_keeps_git_order_for_commits_in_the_same_second():
+    same = at(2024, 1, 1)
+    older, newer = make_commit(same, "older"), make_commit(same, "newer")
+    # git lists newest first.
+    assert [e.subject for e in commit_history([newer, older]).entries] == ["newer", "older"]
+
+
+def test_commit_history_compact_form_and_report():
+    history = commit_history(_history_sample())
+    compact = history.to_compact()
+    assert compact["total"] == 4 and len(compact["commits"]) == 4
+    assert compact["authors"][0][0] == "Ada Lovelace"
+    row = compact["commits"][2]  # "Rename the app"
+    assert row[1] == "Rename the app" and compact["authors"][row[3]][0] == "Grace"
+    path, old, status = row[13][0][:3]
+    assert (compact["paths"][path], compact["paths"][old], status) == ("main.py", "app.py", "R")
+    assert row[9] == 86400  # a day after the first commit
+    assert compact["commits"][3][9] == -1  # the first commit has no previous one
+
+    sample = _history_sample()
+    data = build_report(sample, "demo").to_dict()
+    assert data["history"]["total"] == 4
+    assert data["history"]["commits"][0][0] == sample[-1].hash

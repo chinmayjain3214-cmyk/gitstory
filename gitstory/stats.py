@@ -18,7 +18,7 @@ import hashlib
 import math
 import re
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta
 from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
@@ -214,6 +214,101 @@ class FunFacts:
     busiest_day: BusiestDay
 
 
+STATUS_CODES = {"modified": "M", "added": "A", "deleted": "D", "renamed": "R"}
+
+
+@dataclass(frozen=True)
+class HistoryFile:
+    """One file in one commit, with its place in that file's own history."""
+
+    path: str
+    old_path: Optional[str]
+    status: str  # "added", "deleted", "renamed" or "modified"
+    added: int
+    removed: int
+    binary: bool
+    lineage: int  # shared by every name the file has had, so renames stay one file
+    touch: int  # this commit is the file's n-th change (1-based)
+    touches: int  # how many commits changed the file in the whole history
+
+
+@dataclass(frozen=True)
+class HistoryEntry:
+    """One commit, as shown in the report's commit history."""
+
+    hash: str
+    subject: str
+    body: str
+    author: str
+    author_key: str
+    initials: str
+    color: str
+    when: datetime
+    type: Optional[str]  # conventional-commit type, if the subject has one
+    merge: bool
+    number: int  # 1 is the first commit of the project
+    author_number: int  # the author's n-th commit
+    since_previous: Optional[int]  # seconds since the commit before it
+    lines_added: int
+    lines_removed: int
+    files_total: int  # may be more than len(files) when the list was cut short
+    files: List[HistoryFile]
+
+
+@dataclass(frozen=True)
+class CommitHistory:
+    total: int  # commits in the analysed history
+    entries: List[HistoryEntry]  # newest first; the most recent ``len(entries)`` commits
+    max_files: int  # files listed per commit at most
+
+    def to_compact(self) -> Dict[str, Any]:
+        """A small JSON shape for the page: authors and paths are stored once.
+
+        ``commits`` rows are ``[hash, subject, body, author, when, type,
+        merge, number, author_number, since_previous, added, removed,
+        files_total, files]`` and each file is ``[path, old_path, status,
+        added, removed, binary, lineage, touch, touches]``. ``author``,
+        ``path`` and ``old_path`` index ``authors`` and ``paths``; missing
+        values are ``-1`` or ``""``.
+        """
+        authors: Dict[str, int] = {}
+        author_rows: List[List[str]] = []
+        paths: Dict[str, int] = {}
+        path_rows: List[str] = []
+
+        def path_index(path: Optional[str]) -> int:
+            if path is None:
+                return -1
+            if path not in paths:
+                paths[path] = len(path_rows)
+                path_rows.append(path)
+            return paths[path]
+
+        rows: List[List[Any]] = []
+        for entry in self.entries:
+            if entry.author_key not in authors:
+                authors[entry.author_key] = len(author_rows)
+                author_rows.append([entry.author, entry.initials, entry.color])
+            files = [
+                [path_index(f.path), path_index(f.old_path), STATUS_CODES.get(f.status, "M"),
+                 f.added, f.removed, int(f.binary), f.lineage, f.touch, f.touches]
+                for f in entry.files
+            ]
+            rows.append([
+                entry.hash, entry.subject, entry.body, authors[entry.author_key],
+                entry.when.isoformat(), entry.type or "", int(entry.merge), entry.number,
+                entry.author_number, -1 if entry.since_previous is None else entry.since_previous,
+                entry.lines_added, entry.lines_removed, entry.files_total, files,
+            ])
+        return {
+            "total": self.total,
+            "max_files": self.max_files,
+            "authors": author_rows,
+            "paths": path_rows,
+            "commits": rows,
+        }
+
+
 @dataclass(frozen=True)
 class Report:
     """Everything the HTML report needs, ready to be serialised to JSON."""
@@ -228,9 +323,12 @@ class Report:
     extensions: List[ExtensionChurn]
     messages: MessageInsights
     facts: FunFacts
+    history: Optional[CommitHistory] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        data = asdict(replace(self, history=None))
+        data["history"] = self.history.to_compact() if self.history is not None else None
+        return data
 
 
 # --------------------------------------------------------------------------
@@ -641,6 +739,93 @@ def fun_facts(commits: Sequence[Commit]) -> FunFacts:
 # --------------------------------------------------------------------------
 
 
+# --------------------------------------------------------------------------
+# Commit history
+# --------------------------------------------------------------------------
+
+
+def commit_history(
+    commits: Sequence[Commit],
+    max_commits: int = 10000,
+    max_files: int = 60,
+    max_body: int = 2000,
+) -> CommitHistory:
+    """Every commit with its files and their history, newest first.
+
+    Each file gets a ``lineage`` id that follows renames, plus ``touch`` (this
+    is its n-th change) and ``touches`` (changes in total). Only the newest
+    ``max_commits`` commits are kept, and each lists at most ``max_files``
+    files (largest changes first), so huge histories stay a sensible size.
+    """
+    # git lists newest first; reversing before the (stable) sort keeps commits
+    # made in the same second in their real order.
+    ordered = sort_commits(list(reversed(commits)))
+    lineage_of: Dict[str, int] = {}
+    touch_count: Counter = Counter()
+    per_commit: List[List[Tuple[Any, int, int]]] = []  # (change, lineage, touch)
+    for commit in ordered:
+        row = []
+        for change in commit.files:
+            if change.old_path and change.old_path in lineage_of:
+                lineage = lineage_of.pop(change.old_path)
+            elif change.path in lineage_of:
+                lineage = lineage_of[change.path]
+            else:
+                lineage = len(touch_count) + 1
+            lineage_of[change.path] = lineage
+            touch_count[lineage] += 1
+            row.append((change, lineage, touch_count[lineage]))
+        per_commit.append(row)
+
+    names: Dict[str, Counter] = {}
+    for commit in ordered:
+        names.setdefault(author_key(commit), Counter())[commit.author_name] += 1
+
+    entries: List[HistoryEntry] = []
+    author_seen: Counter = Counter()
+    start = max(0, len(ordered) - max_commits)
+    previous: Optional[Commit] = None
+    for number, (commit, row) in enumerate(zip(ordered, per_commit), start=1):
+        key = author_key(commit)
+        author_seen[key] += 1
+        if number - 1 >= start:
+            name = names[key].most_common(1)[0][0]
+            ranked = sorted(row, key=lambda item: (-item[0].changed, item[0].path))
+            entries.append(HistoryEntry(
+                hash=commit.hash,
+                subject=_clip(commit.subject, 300),
+                body=_clip(commit.body, max_body),
+                author=name,
+                author_key=key,
+                initials=initials(name),
+                color=avatar_color(commit.author_email or name),
+                when=commit.timestamp,
+                type=conventional_type(commit.subject),
+                merge=commit.is_merge,
+                number=number,
+                author_number=author_seen[key],
+                since_previous=(
+                    max(0, int((commit.timestamp - previous.timestamp).total_seconds()))
+                    if previous is not None else None
+                ),
+                lines_added=commit.lines_added,
+                lines_removed=commit.lines_removed,
+                files_total=len(row),
+                files=[
+                    HistoryFile(
+                        path=change.path, old_path=change.old_path,
+                        status="renamed" if change.old_path else change.status,
+                        added=change.added, removed=change.removed, binary=change.binary,
+                        lineage=lineage, touch=touch, touches=touch_count[lineage],
+                    )
+                    for change, lineage, touch in ranked[:max_files]
+                ],
+            ))
+        previous = commit
+    entries.reverse()
+    return CommitHistory(total=len(ordered), entries=entries, max_files=max_files)
+
+
 def build_report(commits: Sequence[Commit], repo_name: str, max_contributors: int = 30) -> Report:
     """Run every analysis and bundle the results for the renderer."""
     if not commits:
@@ -657,4 +842,5 @@ def build_report(commits: Sequence[Commit], repo_name: str, max_contributors: in
         extensions=extension_churn(commits),
         messages=message_insights(commits),
         facts=fun_facts(commits),
+        history=commit_history(commits),
     )
