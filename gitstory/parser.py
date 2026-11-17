@@ -15,10 +15,10 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Set, Tuple, Union
 
 # ASCII "record separator" and "unit separator": control characters that do not
 # show up in real commit messages, author names or file paths.
@@ -35,6 +35,7 @@ LOG_FORMAT = "%x1e%H%x1f%aN%x1f%aE%x1f%ad%x1f%P%x1f%B%x1f"
 _RECORD_START = re.compile(RECORD_SEP + r"(?=[0-9a-f]{40,64}" + FIELD_SEP + ")")
 _BRACE_RENAME = re.compile(r"^(?P<pre>.*)\{(?P<old>.*) => (?P<new>.*)\}(?P<post>.*)$")
 _RAW_DATE = re.compile(r"^(-?\d+)(?:\s+([+-])(\d{2})(\d{2}))?")
+_SUMMARY_LINE = re.compile(r"^ (create|delete) mode \d+ (.+)$")
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _SIMPLE_ESCAPES = {
     "a": 0x07, "b": 0x08, "t": 0x09, "n": 0x0A, "v": 0x0B,
@@ -79,6 +80,7 @@ class FileChange:
     removed: int = 0
     binary: bool = False
     old_path: Optional[str] = None  # set when the file was renamed in this commit
+    status: str = "modified"  # "added", "deleted", "renamed" or "modified"
 
     @property
     def changed(self) -> int:
@@ -166,9 +168,11 @@ def _parse_record(record: str) -> Optional[Commit]:
     if len(fields) != 6:
         return None
     commit_hash, name, email, raw_date, parents, message = fields
+    lines = numstat.split("\n")
+    created, deleted = parse_summary_lines(lines)
     files = tuple(
-        change
-        for change in (parse_numstat_line(line) for line in numstat.split("\n"))
+        _with_status(change, created, deleted)
+        for change in (parse_numstat_line(line) for line in lines)
         if change is not None
     )
     return Commit(
@@ -180,6 +184,34 @@ def _parse_record(record: str) -> Optional[Commit]:
         files=files,
         parents=tuple(parents.split()),
     )
+
+
+def parse_summary_lines(lines: Sequence[str]) -> Tuple[Set[str], Set[str]]:
+    """Read the paths ``--summary`` reports as created and deleted.
+
+    Those lines look like ``" create mode 100644 src/app.py"``. Renames and
+    mode changes are also listed there; renames are already known from the
+    numstat line, and mode changes do not matter for the report.
+    """
+    created: Set[str] = set()
+    deleted: Set[str] = set()
+    for line in lines:
+        match = _SUMMARY_LINE.match(line.rstrip("\r"))
+        if match:
+            (created if match.group(1) == "create" else deleted).add(_unquote_path(match.group(2)))
+    return created, deleted
+
+
+def _with_status(change: FileChange, created: Set[str], deleted: Set[str]) -> FileChange:
+    if change.old_path is not None:
+        status = "renamed"
+    elif change.path in created:
+        status = "added"
+    elif change.path in deleted:
+        status = "deleted"
+    else:
+        return change
+    return replace(change, status=status)
 
 
 def parse_raw_date(value: str) -> datetime:
@@ -301,6 +333,7 @@ def build_log_command(
         "--no-color",
         "--date=raw",
         "--numstat",
+        "--summary",                      # marks created and deleted files
         "-M",                             # detect renames
         "--pretty=format:" + LOG_FORMAT,
     ]

@@ -164,3 +164,27 @@ def test_build_log_command_passes_filters_through():
     assert "--until=1 week ago" in command
     assert "--author=ada" in command
     assert not any(arg.startswith("--since") for arg in build_log_command("repo"))
+
+
+def test_summary_lines_mark_created_and_deleted_files():
+    from gitstory.parser import parse_git_log
+
+    sep, rec = "\x1f", "\x1e"
+    text = (
+        f"{rec}{'a' * 40}{sep}Ada{sep}ada@example.com{sep}1700000000 +0000{sep}{sep}Add and drop{sep}\n"
+        "5\t0\tnew.py\n"
+        "0\t7\told.py\n"
+        "2\t1\tkept.py\n"
+        "0\t0\tsrc/{a => b}/c.py\n"
+        "-\t-\tlogo.png\n"
+        " create mode 100644 new.py\n"
+        " delete mode 100644 old.py\n"
+        " create mode 100644 logo.png\n"
+        " rename src/{a => b}/c.py (100%)\n"
+        " mode change 100644 => 100755 kept.py\n"
+    )
+    (commit,) = parse_git_log(text)
+    status = {f.path: f.status for f in commit.files}
+    assert status == {"new.py": "added", "old.py": "deleted", "kept.py": "modified",
+                      "src/b/c.py": "renamed", "logo.png": "added"}
+    assert next(f for f in commit.files if f.path == "logo.png").binary
