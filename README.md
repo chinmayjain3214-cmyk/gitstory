@@ -17,8 +17,9 @@ Point it at a local git repository, or paste a GitHub link, and get a single sel
 - **Contributors**: ranked cards with coloured avatar initials, commit and line counts, first and last active dates, and an activity sparkline.
 - **When the code gets written**: a 7×24 heatmap of commit times plus a label derived from the data, such as "Night owl 🦉" or "9-to-5er ☀️".
 - **File churn**: the 15 most-changed files and the top languages by lines changed. Renamed files keep their history.
+- **Commit history**: press the button to load the latest 10 commits, then 10 more at a time. Open a commit to see its full message and every file it changed (new, deleted, renamed or edited, with lines added and removed), plus each file's history: "change 9 of 14". Click that to list every commit that ever touched the file, even across renames. Search by message, author, hash or file name, filter by commit type, copy a hash, or open the commit on GitHub.
 - **Commit message insights**: average length, most common words, share of conventional-commit prefixes, and the longest and shortest messages.
-- **Fun facts**: biggest single commit, longest streak, longest gap and busiest day ever.
+- **Fun facts**: biggest single commit, longest streak, longest gap and busiest day ever. Click a commit hash to jump to it in the commit history.
 - **One file, zero requests**: all CSS, JavaScript and data are inlined. Charts are hand-drawn SVG, with no chart library and no CDN.
 - **Dark and light themes**, a responsive layout down to phone width, scroll-in animations, and full support for `prefers-reduced-motion`.
 - **Standard library only**: Python 3.9+ and `git`. Nothing else to install.
@@ -215,6 +216,7 @@ Where the idea left room for interpretation, these are the choices gitstory make
 - **Which date**: the author date, in the author's own timezone. "Day", "week" and "hour" always mean the local calendar of whoever made the commit, so a commit made at 23:30 in New York counts as a late-night commit wherever the report is generated. Ordering and gaps use absolute time.
 - **Weeks** start on Monday. Quiet weeks appear as zeros so the timeline keeps its real shape. Histories of 26 weeks or fewer are drawn as bars; longer ones as an area chart.
 - **Top commit message** of a week is the subject of its largest non-merge commit by lines changed.
+- **Commit history** includes the newest 10,000 commits (about 1 MB of report for 6,000 commits) and lists up to 60 files per commit, biggest changes first; the rest are counted but not listed. A file's "change N of M" follows renames, so a file keeps its history under a new name. New and deleted files come from `git log --summary`.
 - **Merge commits** count as commits but carry no line statistics (git reports none for them by default, which avoids counting the same change twice). They are left out of the commit-message insights because their messages are usually auto-generated.
 - **Binary files** (`-` in numstat) count as a file change with zero lines.
 - **Renames** are detected by git (`-M`) and followed: a renamed file's earlier churn moves to its new name.
