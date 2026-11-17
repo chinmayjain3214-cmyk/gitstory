@@ -17,7 +17,7 @@ import pytest
 
 from gitstory.github import CloneError, GitHubRepo, clone_repository
 from gitstory.render import render_home
-from gitstory.server import StoryService, make_server
+from gitstory.server import StoryService, bind_server, make_server
 
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
 
@@ -164,3 +164,25 @@ def test_requests_from_other_sites_are_refused(site):
     # A page reached through DNS rebinding has a foreign Host header.
     assert request(base + "/", headers={"Host": "evil.example:8765"})[0] == 403
     assert request(base + "/", headers={"Host": "localhost:8765"})[0] == 200
+
+
+def test_busy_port_moves_to_a_free_one(tmp_path):
+    first = make_server("127.0.0.1", 0, StoryService(tmp_path / "a"))
+    busy = first.server_address[1]
+    try:
+        second, note = bind_server("127.0.0.1", busy, StoryService(tmp_path / "b"))
+        try:
+            assert second.server_address[1] != busy
+            assert note and str(busy) in note
+        finally:
+            second.server_close()
+    finally:
+        first.server_close()
+
+
+def test_free_port_is_used_as_asked(tmp_path):
+    server, note = bind_server("127.0.0.1", 0, StoryService(tmp_path))
+    try:
+        assert note is None
+    finally:
+        server.server_close()

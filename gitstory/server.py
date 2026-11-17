@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import json
 import shutil
+import socket
+import sys
 import tempfile
 import threading
 import time
@@ -167,6 +169,16 @@ class StoryService:
 
 class StoryServer(ThreadingHTTPServer):
     daemon_threads = True
+    # On Windows, SO_REUSEADDR lets a second server bind a port that another
+    # one is still listening on, and the old one keeps answering. Ask for the
+    # port exclusively there so a stale gitstory can never hide a new one.
+    allow_reuse_address = sys.platform != "win32"
+
+    def server_bind(self) -> None:
+        exclusive = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+        if sys.platform == "win32" and exclusive is not None:
+            self.socket.setsockopt(socket.SOL_SOCKET, exclusive, 1)
+        super().server_bind()
 
     def __init__(self, address: Tuple[str, int], service: StoryService) -> None:
         super().__init__(address, StoryHandler)
@@ -321,12 +333,31 @@ def make_server(host: str, port: int, service: StoryService) -> StoryServer:
     return StoryServer((host, port), service)
 
 
+def bind_server(host: str, port: int, service: StoryService) -> Tuple[StoryServer, Optional[str]]:
+    """Start listening, moving to a free port if the chosen one is busy.
+
+    Returns the server and, when it had to move, a note explaining why.
+    """
+    try:
+        return make_server(host, port, service), None
+    except OSError as error:
+        if port == 0:
+            raise
+        server = make_server(host, 0, service)
+        note = (
+            f"Port {port} is already in use (probably an older gitstory that is still "
+            f"running; close that window to stop it), so this one uses port "
+            f"{server.server_address[1]}."
+        )
+        return server, note
+
+
 def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False) -> int:
     """Run the web mode until Ctrl+C. Returns a process exit code."""
     with tempfile.TemporaryDirectory(prefix="gitstory-") as workdir:
         service = StoryService(Path(workdir))
         try:
-            server = make_server(host, port, service)
+            server, note = bind_server(host, port, service)
         except OSError as error:
             raise GitStoryError(
                 f"could not listen on {host}:{port} ({error.strerror or error}); "
@@ -334,6 +365,8 @@ def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False)
             ) from error
         shown_host = "localhost" if host in ("127.0.0.1", "0.0.0.0", "::", "") else host
         url = f"http://{shown_host}:{server.server_address[1]}/"
+        if note:
+            print(note)
         print(f"gitstory is running at {url}")
         print("Paste a GitHub link there to see its story. Press Ctrl+C to stop.")
         if open_browser:
