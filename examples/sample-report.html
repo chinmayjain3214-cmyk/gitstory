@@ -175,6 +175,104 @@ ol, ul { padding: 0; list-style: none; }
 .report-nav a:hover { color: var(--ink); border-color: var(--muted); }
 .report-nav a:first-child { color: var(--ink); }
 
+/* ---- Download story menu */
+.dl { position: relative; }
+.dl-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 7px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, var(--accent-a), var(--accent-b)) border-box;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: box-shadow 0.25s ease, transform 0.2s ease;
+}
+.dl-button svg { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dl-button:hover { box-shadow: 0 0 0 4px var(--glow); }
+.dl-button:active { transform: translateY(1px); }
+.dl-button:focus-visible, .dl-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dl-caret { color: var(--muted); font-size: 0.75rem; transition: transform 0.25s ease; }
+.dl.is-open .dl-caret { transform: rotate(180deg); }
+
+.dl-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 20;
+  width: min(360px, calc(100vw - 32px));
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow), 0 24px 60px -30px rgba(0, 0, 0, 0.6);
+  transform-origin: 24px -8px;
+  animation: dl-pop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+.dl-menu[hidden] { display: none; }
+.dl-menu-title {
+  margin: 4px 8px 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.dl-item {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: commit-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms + 60ms);
+  transition: background 0.2s ease;
+}
+.dl-item:hover:not(:disabled), .dl-item:focus-visible { background: var(--surface-2); }
+.dl-item:disabled { cursor: progress; }
+.dl.is-busy .dl-item:not(.is-working) { opacity: 0.45; }
+.dl-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  transition: transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.dl-icon svg { fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dl-item:hover:not(:disabled) .dl-icon { transform: scale(1.08) rotate(-4deg); }
+.dl-item.is-working .dl-icon { animation: dl-pulse 1s ease-in-out infinite; }
+.dl-text { display: grid; gap: 2px; min-width: 0; }
+.dl-text strong { font-size: 0.9375rem; }
+.dl-text small { color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+.dl-ext { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+.dl-status { margin: 6px 8px 0; color: var(--ink-2); font-size: 0.8125rem; }
+.dl-status:empty { display: none; }
+.dl-status.is-done { color: var(--added); }
+.dl-status.is-done::before { content: "✓ "; }
+.dl-status.is-error { color: var(--removed); }
+.dl-note { margin: 8px 8px 4px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
+
+@keyframes dl-pop { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes dl-pulse { 50% { transform: scale(0.9); opacity: 0.7; } }
+
+/* While the page is measured for an image or PDF: everything in its final place. */
+.is-capturing *, .is-capturing *::before, .is-capturing *::after { animation: none !important; transition: none !important; }
+
 .hero-source {
   display: inline-block;
   margin-top: 0.5rem;
@@ -930,7 +1028,7 @@ span.cfile-history { cursor: default; border-style: dashed; color: var(--muted);
 
 @media (prefers-reduced-motion: reduce) {
   .reveal, .reveal .bar-fill, .reveal .hm-cell::after, .tl-bar { transition: none; }
-  .commit, .commit::before, .commit .diffbar, .cfile, .cfile-bar, .commit-card, .history-browser, .history-file-filter { animation: none !important; }
+  .commit, .commit::before, .commit .diffbar, .cfile, .cfile-bar, .commit-card, .history-browser, .history-file-filter, .dl-menu, .dl-item, .dl-icon { animation: none !important; }
   .commit-details, .commit-chevron, .history-open, .history-open-arrow { transition: none; }
   .reveal { opacity: 1; transform: none; }
   .reveal .bar-fill { transform: none; }
@@ -953,6 +1051,7 @@ span.cfile-history { cursor: default; border-style: dashed; color: var(--muted);
   .hm-hour, .hm-day { font-size: 0.6875rem; }
   .theme-toggle { top: 12px; right: 12px; }
   .report-nav { top: 12px; left: 16px; right: 120px; }
+  .has-nav-links .hero { padding-top: max(7.5rem, 15vh); }  /* room for the two rows of buttons */
   .bar-value small { display: none; }
   .bars.is-two-col { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   .commits { padding-left: 20px; }
@@ -1088,13 +1187,17 @@ span.cfile-history { cursor: default; border-style: dashed; color: var(--muted);
 <div class="tooltip" id="tooltip" role="status" aria-live="polite" hidden></div>
 <noscript><p class="noscript">This report draws its charts with JavaScript. Enable JavaScript to see it.</p></noscript>
 
-<script id="gitstory-data" type="application/json">{"repo_name":"gitstory","summary":{"commits":13,"contributors":1,"merges":0,"files_touched":29,"lines_added":10163,"lines_removed":47,"first_commit":"2026-11-16T18:22:46+00:00","last_commit":"2026-11-17T17:42:51+00:00","age_days":1},"timeline":[{"start":"2026-11-16","commits":13,"lines_added":10163,"lines_removed":47,"top_message":"feat(render): build the self-contained animated HTML report and the CLI"}],"contributors":[{"name":"gitstory-dev","initials":"GD","color":"hsl(20, 58%, 46%)","commits":13,"lines_added":10163,"lines_removed":47,"first_active":"2026-11-16","last_active":"2026-11-17","sparkline":[10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3]}],"heatmap":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"persona":{"label":"After-hours hacker","emoji":"🌆","description":"77% of commits land between 6pm and 10pm."},"files":[{"path":"examples/demo-report.html","lines_added":2206,"lines_removed":7,"commits":3},{"path":"examples/sample-report.html","lines_added":1344,"lines_removed":0,"commits":1},{"path":"gitstory/assets/report.js","lines_added":1107,"lines_removed":4,"commits":4},{"path":"gitstory/assets/report.css","lines_added":966,"lines_removed":2,"commits":3},{"path":"gitstory/stats.py","lines_added":848,"lines_removed":2,"commits":2},{"path":"gitstory/parser.py","lines_added":427,"lines_removed":4,"commits":2},{"path":"tests/test_stats.py","lines_added":428,"lines_removed":0,"commits":2},{"path":"gitstory/server.py","lines_added":347,"lines_removed":0,"commits":1},{"path":"gitstory/assets/home.js","lines_added":306,"lines_removed":0,"commits":1},{"path":"README.md","lines_added":268,"lines_removed":8,"commits":3},{"path":"gitstory/assets/home.css","lines_added":240,"lines_removed":0,"commits":1},{"path":"tests/test_parser.py","lines_added":190,"lines_removed":0,"commits":2},{"path":"gitstory/github.py","lines_added":182,"lines_removed":0,"commits":1},{"path":"gitstory/cli.py","lines_added":159,"lines_removed":9,"commits":3},{"path":"tests/test_server.py","lines_added":166,"lines_removed":0,"commits":1}],"extensions":[{"extension":".html","language":"HTML","lines_changed":3824,"files":4,"share":0.3745347698334966},{"extension":".py","language":"Python","lines_changed":3393,"files":15,"share":0.33232125367286974},{"extension":".js","language":"JavaScript","lines_changed":1417,"files":2,"share":0.1387855044074437},{"extension":".css","language":"CSS","lines_changed":1208,"files":2,"share":0.11831537708129285},{"extension":".md","language":"Markdown","lines_changed":276,"files":1,"share":0.02703232125367287},{"extension":".toml","language":"TOML","lines_changed":43,"files":1,"share":0.0042115572967678745},{"extension":".gitignore","language":".gitignore","lines_changed":28,"files":1,"share":0.002742409402546523},{"extension":"(no extension)","language":"(no extension)","lines_changed":21,"files":1,"share":0.002056807051909892}],"messages":{"analysed":13,"average_length":56.7,"average_words":8.9,"common_words":[{"word":"add","count":5},{"word":"commit","count":3},{"word":"history","count":3},{"word":"github","count":2},{"word":"gitstory","count":2},{"word":"mode","count":2},{"word":"report","count":2},{"word":"summary","count":2},{"word":"web","count":2},{"word":"added","count":1},{"word":"analysis","count":1},{"word":"animated","count":1}],"conventional_count":13,"conventional_share":1.0,"conventional_types":[{"type":"feat","count":6},{"type":"docs","count":4},{"type":"fix","count":2},{"type":"chore","count":1}],"longest":{"text":"feat(stats): add timeline, contributor, heatmap, churn and message analysis","hash":"9325f7c","author":"gitstory-dev","when":"2026-11-16T18:22:47+00:00","length":75},"shortest":{"text":"docs: describe the commit history","hash":"cdaba19","author":"gitstory-dev","when":"2026-11-17T17:42:51+00:00","length":33}},"facts":{"biggest_commit":{"hash":"21d4597","subject":"feat(render): build the self-contained animated HTML report and the CLI","author":"gitstory-dev","when":"2026-11-16T18:22:47+00:00","lines_added":1735,"lines_removed":0,"files":8},"longest_streak":{"days":2,"start":"2026-11-16","end":"2026-11-17"},"longest_gap":{"seconds":82839,"start":"2026-11-16T18:42:12+00:00","end":"2026-11-17T17:42:51+00:00"},"busiest_day":{"day":"2026-11-16","commits":10}},"history":{"total":13,"max_files":60,"authors":[["gitstory-dev","GD","hsl(20, 58%, 46%)"]],"paths":["examples/demo-report.html","README.md","gitstory/assets/report.js","gitstory/assets/report.css","gitstory/stats.py","tests/test_stats.py","gitstory/assets/template.html","gitstory/parser.py","tests/test_parser.py","docs/home.png","gitstory/server.py","gitstory/assets/home.js","gitstory/assets/home.css","gitstory/github.py","tests/test_server.py","gitstory/assets/home.html","tests/test_github.py","gitstory/cli.py","gitstory/render.py","examples/sample-report.html","tests/test_cli.py","examples/make_demo_repo.py","docs/screenshot.png","tests/test_render.py","gitstory/__main__.py","pyproject.toml",".gitignore","LICENSE","gitstory/__init__.py"],"commits":[["cdaba1969118c144aca784eb644bea51c5151ae2","docs: describe the commit history","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","docs",0,13,13,0,863,6,2,[[0,-1,"M",860,5,0,19,3,3],[1,-1,"M",3,1,0,17,3,3]]],["c91a77060729b00194bca2236ecf5870478eac92","feat(report): add a commit history chapter that loads 10 commits at a time","Each commit opens to show its message, the files it changed and each\nfile's own history across renames. Includes search, type filters,\nper-file history, copy hash and links to GitHub.\n\nCo-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","feat",0,12,12,0,1061,5,5,[[2,-1,"M",384,2,0,11,4,4],[3,-1,"M",376,1,0,10,3,3],[4,-1,"M",188,2,0,7,2,2],[5,-1,"M",82,0,0,8,2,2],[6,-1,"M",31,0,0,12,3,3]]],["f99362c06d3b423cc0538823d1d7ac69f9f101c8","feat(parser): mark files as added, deleted or renamed using --summary","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","feat",0,11,11,82839,61,4,2,[[7,-1,"M",37,4,0,5,2,2],[8,-1,"M",24,0,0,6,2,2]]],["a6a2fbc54b15c866abd92cb964ef8e9b7bb7ddcd","docs: document web mode and GitHub links","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:42:12+00:00","docs",0,10,10,0,62,7,2,[[1,-1,"M",62,7,0,17,2,3],[9,-1,"A",0,0,1,29,1,1]]],["5f1a9fbde89a3647c7a487c23b2940e663d7013e","feat(web): add a web mode where you paste a GitHub link and get its story","gitstory --serve starts a local website. Its home page explains what\ngitstory does and asks for a GitHub link; after the visitor confirms,\na background job clones the repository, shows live progress and opens\nthe report. The CLI also accepts GitHub links directly.\n\nCo-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:42:12+00:00","feat",0,9,9,1136,1669,19,12,[[10,-1,"A",347,0,0,26,1,1],[11,-1,"A",306,0,0,24,1,1],[12,-1,"A",240,0,0,22,1,1],[13,-1,"A",182,0,0,25,1,1],[14,-1,"A",166,0,0,28,1,1],[15,-1,"A",135,0,0,23,1,1],[16,-1,"A",117,0,0,27,1,1],[17,-1,"M",66,7,0,13,3,3],[18,-1,"M",41,10,0,14,2,2],[3,-1,"M",34,1,0,10,2,3],[2,-1,"M",33,1,0,11,3,4],[6,-1,"M",2,0,0,12,2,3]]],["cbf72f8e5df1fe5912cfdd9cfc146350886e8c82","docs: add a sample report of gitstory's own history","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","docs",0,8,8,0,1344,0,1,[[19,-1,"A",1344,0,0,21,1,1]]],["552543b020cb2f2b430a18460c36004970651124","fix(render): word same-day gaps sensibly in the fun facts","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","fix",0,7,7,0,9,3,2,[[0,-1,"M",5,2,0,19,2,3],[2,-1,"M",4,1,0,11,2,4]]],["33742276ba3d6e31ccab24f2823f4a97e6d5664a","fix(cli): use singular nouns in the summary line","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","fix",0,6,6,29,8,3,2,[[17,-1,"M",7,2,0,13,2,3],[20,-1,"M",1,1,0,15,2,2]]],["6aa98645a3d0723eb5f722044b1d7d4eed0296d7","docs: add README, screenshot and demo example","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","docs",0,5,5,0,1690,0,4,[[0,-1,"A",1341,0,0,19,1,3],[1,-1,"A",203,0,0,17,1,3],[21,-1,"A",146,0,0,20,1,1],[22,-1,"A",0,0,1,18,1,1]]],["21d4597ccfef13defeb210858949319f56f1bcc9","feat(render): build the self-contained animated HTML report and the CLI","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,4,4,0,1735,0,8,[[2,-1,"A",686,0,0,11,1,4],[3,-1,"A",556,0,0,10,1,3],[20,-1,"A",106,0,0,15,1,2],[18,-1,"A",104,0,0,14,1,2],[6,-1,"A",99,0,0,12,1,3],[23,-1,"A",88,0,0,16,1,1],[17,-1,"A",86,0,0,13,1,3],[24,-1,"A",10,0,0,9,1,1]]],["9325f7c906884eb13e8d2d6b1897b61cb974d677","feat(stats): add timeline, contributor, heatmap, churn and message analysis","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,3,3,0,1006,0,2,[[4,-1,"A",660,0,0,7,1,2],[5,-1,"A",346,0,0,8,1,2]]],["28b06800f6137a8a9b07bdda92cd769f07f0ea77","feat(parser): read git log into Commit and FileChange dataclasses","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,2,2,1,556,0,2,[[7,-1,"A",390,0,0,5,1,2],[8,-1,"A",166,0,0,6,1,2]]],["366d507d7f93d3944387ce40578ab9a547661027","chore: scaffold the gitstory package","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:46+00:00","chore",0,1,1,-1,99,0,4,[[25,-1,"A",43,0,0,4,1,1],[26,-1,"A",28,0,0,1,1,1],[27,-1,"A",21,0,0,2,1,1],[28,-1,"A",7,0,0,3,1,1]]]]},"meta":{"version":"0.1.0","generated_at":"2026-11-17T17:42:51+00:00","filters":{},"source":null,"links":[]}}</script>
+<script id="gitstory-data" type="application/json">{"repo_name":"gitstory","summary":{"commits":16,"contributors":1,"merges":0,"files_touched":29,"lines_added":12047,"lines_removed":75,"first_commit":"2026-11-16T18:22:46+00:00","last_commit":"2026-11-17T18:44:55+00:00","age_days":2},"timeline":[{"start":"2026-11-16","commits":16,"lines_added":12047,"lines_removed":75,"top_message":"feat(render): build the self-contained animated HTML report and the CLI"}],"contributors":[{"name":"gitstory-dev","initials":"GD","color":"hsl(20, 58%, 46%)","commits":16,"lines_added":12047,"lines_removed":75,"first_active":"2026-11-16","last_active":"2026-11-17","sparkline":[10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,2]}],"heatmap":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"persona":{"label":"After-hours hacker","emoji":"🌆","description":"69% of commits land between 6pm and 10pm."},"files":[{"path":"examples/demo-report.html","lines_added":2674,"lines_removed":11,"commits":4},{"path":"examples/sample-report.html","lines_added":2204,"lines_removed":5,"commits":2},{"path":"gitstory/assets/report.js","lines_added":1474,"lines_removed":6,"commits":5},{"path":"gitstory/assets/report.css","lines_added":1066,"lines_removed":3,"commits":4},{"path":"gitstory/stats.py","lines_added":848,"lines_removed":2,"commits":2},{"path":"gitstory/parser.py","lines_added":427,"lines_removed":4,"commits":2},{"path":"tests/test_stats.py","lines_added":428,"lines_removed":0,"commits":2},{"path":"gitstory/server.py","lines_added":385,"lines_removed":7,"commits":3},{"path":"gitstory/assets/home.js","lines_added":306,"lines_removed":0,"commits":1},{"path":"README.md","lines_added":275,"lines_removed":12,"commits":4},{"path":"gitstory/assets/home.css","lines_added":240,"lines_removed":0,"commits":1},{"path":"tests/test_server.py","lines_added":195,"lines_removed":3,"commits":3},{"path":"tests/test_parser.py","lines_added":190,"lines_removed":0,"commits":2},{"path":"gitstory/github.py","lines_added":182,"lines_removed":0,"commits":1},{"path":"gitstory/cli.py","lines_added":159,"lines_removed":9,"commits":3}],"extensions":[{"extension":".html","language":"HTML","lines_changed":5161,"files":4,"share":0.42575482593631414},{"extension":".py","language":"Python","lines_changed":3487,"files":15,"share":0.28765880217785844},{"extension":".js","language":"JavaScript","lines_changed":1786,"files":2,"share":0.14733542319749215},{"extension":".css","language":"CSS","lines_changed":1309,"files":2,"share":0.10798548094373865},{"extension":".md","language":"Markdown","lines_changed":287,"files":1,"share":0.023675961062530934},{"extension":".toml","language":"TOML","lines_changed":43,"files":1,"share":0.003547269427487213},{"extension":".gitignore","language":".gitignore","lines_changed":28,"files":1,"share":0.0023098498597591156},{"extension":"(no extension)","language":"(no extension)","lines_changed":21,"files":1,"share":0.0017323873948193367}],"messages":{"analysed":16,"average_length":57.5,"average_words":9.2,"common_words":[{"word":"add","count":6},{"word":"commit","count":3},{"word":"history","count":3},{"word":"report","count":3},{"word":"github","count":2},{"word":"gitstory","count":2},{"word":"html","count":2},{"word":"mode","count":2},{"word":"sample","count":2},{"word":"story","count":2},{"word":"summary","count":2},{"word":"web","count":2}],"conventional_count":16,"conventional_share":1.0,"conventional_types":[{"type":"feat","count":7},{"type":"docs","count":5},{"type":"fix","count":3},{"type":"chore","count":1}],"longest":{"text":"feat(report): add a Download story menu with long image, PDF and offline HTML","hash":"f84d4eb","author":"gitstory-dev","when":"2026-11-17T18:44:55+00:00","length":77},"shortest":{"text":"docs: describe the commit history","hash":"cdaba19","author":"gitstory-dev","when":"2026-11-17T17:42:51+00:00","length":33}},"facts":{"biggest_commit":{"hash":"21d4597","subject":"feat(render): build the self-contained animated HTML report and the CLI","author":"gitstory-dev","when":"2026-11-16T18:22:47+00:00","lines_added":1735,"lines_removed":0,"files":8},"longest_streak":{"days":2,"start":"2026-11-16","end":"2026-11-17"},"longest_gap":{"seconds":82839,"start":"2026-11-16T18:42:12+00:00","end":"2026-11-17T17:42:51+00:00"},"busiest_day":{"day":"2026-11-16","commits":10}},"history":{"total":16,"max_files":60,"authors":[["gitstory-dev","GD","hsl(20, 58%, 46%)"]],"paths":["examples/demo-report.html","gitstory/assets/report.js","gitstory/assets/report.css","README.md","gitstory/server.py","gitstory/render.py","tests/test_render.py","tests/test_server.py","examples/sample-report.html","gitstory/stats.py","tests/test_stats.py","gitstory/assets/template.html","gitstory/parser.py","tests/test_parser.py","docs/home.png","gitstory/assets/home.js","gitstory/assets/home.css","gitstory/github.py","gitstory/assets/home.html","tests/test_github.py","gitstory/cli.py","tests/test_cli.py","examples/make_demo_repo.py","docs/screenshot.png","gitstory/__main__.py","pyproject.toml",".gitignore","LICENSE","gitstory/__init__.py"],"commits":[["f84d4eb9b98b45ef0e5a49b5a924a03ddb6cc75b","feat(report): add a Download story menu with long image, PDF and offline HTML","The nav button opens a menu of three formats. The image and PDF are drawn in\nthe browser from the page as it looks now (SVG foreignObject onto a canvas,\nno libraries); the PDF is cut into A4 pages just above headings, cards and\ncommits. The HTML option saves a self-contained copy that works offline:\nthe web mode serves one without links back to the server, and a report\nopened from a file saves the copy it was opened from, in the chosen theme.\n\nCo-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T18:44:55+00:00","feat",0,16,16,2842,967,21,8,[[0,-1,"M",468,4,0,19,4,4],[1,-1,"M",367,2,0,11,5,5],[2,-1,"M",100,1,0,10,4,4],[3,-1,"M",7,4,0,17,4,4],[4,-1,"M",4,6,0,26,3,3],[5,-1,"M",7,2,0,14,3,3],[6,-1,"M",8,0,0,16,2,2],[7,-1,"M",6,2,0,28,3,3]]],["16c43d46c9fa1c71c8a8888cc830ea020a13dd6a","fix(web): never share a busy port on Windows; move to a free one instead","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:57:33+00:00","fix",0,15,15,882,57,2,2,[[4,-1,"M",34,1,0,26,2,3],[7,-1,"M",23,1,0,28,2,3]]],["6142a0801789c8e0bb8f41d3ae6f7c395dfdd6a3","docs: regenerate the sample report","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","docs",0,14,14,0,860,5,1,[[8,-1,"M",860,5,0,21,2,2]]],["cdaba1969118c144aca784eb644bea51c5151ae2","docs: describe the commit history","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","docs",0,13,13,0,863,6,2,[[0,-1,"M",860,5,0,19,3,4],[3,-1,"M",3,1,0,17,3,4]]],["c91a77060729b00194bca2236ecf5870478eac92","feat(report): add a commit history chapter that loads 10 commits at a time","Each commit opens to show its message, the files it changed and each\nfile's own history across renames. Includes search, type filters,\nper-file history, copy hash and links to GitHub.\n\nCo-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","feat",0,12,12,0,1061,5,5,[[1,-1,"M",384,2,0,11,4,5],[2,-1,"M",376,1,0,10,3,4],[9,-1,"M",188,2,0,7,2,2],[10,-1,"M",82,0,0,8,2,2],[11,-1,"M",31,0,0,12,3,3]]],["f99362c06d3b423cc0538823d1d7ac69f9f101c8","feat(parser): mark files as added, deleted or renamed using --summary","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-17T17:42:51+00:00","feat",0,11,11,82839,61,4,2,[[12,-1,"M",37,4,0,5,2,2],[13,-1,"M",24,0,0,6,2,2]]],["a6a2fbc54b15c866abd92cb964ef8e9b7bb7ddcd","docs: document web mode and GitHub links","Co-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:42:12+00:00","docs",0,10,10,0,62,7,2,[[3,-1,"M",62,7,0,17,2,4],[14,-1,"A",0,0,1,29,1,1]]],["5f1a9fbde89a3647c7a487c23b2940e663d7013e","feat(web): add a web mode where you paste a GitHub link and get its story","gitstory --serve starts a local website. Its home page explains what\ngitstory does and asks for a GitHub link; after the visitor confirms,\na background job clones the repository, shows live progress and opens\nthe report. The CLI also accepts GitHub links directly.\n\nCo-Authored-By: Claude Opus 5.5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:42:12+00:00","feat",0,9,9,1136,1669,19,12,[[4,-1,"A",347,0,0,26,1,3],[15,-1,"A",306,0,0,24,1,1],[16,-1,"A",240,0,0,22,1,1],[17,-1,"A",182,0,0,25,1,1],[7,-1,"A",166,0,0,28,1,3],[18,-1,"A",135,0,0,23,1,1],[19,-1,"A",117,0,0,27,1,1],[20,-1,"M",66,7,0,13,3,3],[5,-1,"M",41,10,0,14,2,3],[2,-1,"M",34,1,0,10,2,4],[1,-1,"M",33,1,0,11,3,5],[11,-1,"M",2,0,0,12,2,3]]],["cbf72f8e5df1fe5912cfdd9cfc146350886e8c82","docs: add a sample report of gitstory's own history","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","docs",0,8,8,0,1344,0,1,[[8,-1,"A",1344,0,0,21,1,2]]],["552543b020cb2f2b430a18460c36004970651124","fix(render): word same-day gaps sensibly in the fun facts","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","fix",0,7,7,0,9,3,2,[[0,-1,"M",5,2,0,19,2,4],[1,-1,"M",4,1,0,11,2,5]]],["33742276ba3d6e31ccab24f2823f4a97e6d5664a","fix(cli): use singular nouns in the summary line","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:23:16+00:00","fix",0,6,6,29,8,3,2,[[20,-1,"M",7,2,0,13,2,3],[21,-1,"M",1,1,0,15,2,2]]],["6aa98645a3d0723eb5f722044b1d7d4eed0296d7","docs: add README, screenshot and demo example","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","docs",0,5,5,0,1690,0,4,[[0,-1,"A",1341,0,0,19,1,4],[3,-1,"A",203,0,0,17,1,4],[22,-1,"A",146,0,0,20,1,1],[23,-1,"A",0,0,1,18,1,1]]],["21d4597ccfef13defeb210858949319f56f1bcc9","feat(render): build the self-contained animated HTML report and the CLI","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,4,4,0,1735,0,8,[[1,-1,"A",686,0,0,11,1,5],[2,-1,"A",556,0,0,10,1,4],[21,-1,"A",106,0,0,15,1,2],[5,-1,"A",104,0,0,14,1,3],[11,-1,"A",99,0,0,12,1,3],[6,-1,"A",88,0,0,16,1,2],[20,-1,"A",86,0,0,13,1,3],[24,-1,"A",10,0,0,9,1,1]]],["9325f7c906884eb13e8d2d6b1897b61cb974d677","feat(stats): add timeline, contributor, heatmap, churn and message analysis","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,3,3,0,1006,0,2,[[9,-1,"A",660,0,0,7,1,2],[10,-1,"A",346,0,0,8,1,2]]],["28b06800f6137a8a9b07bdda92cd769f07f0ea77","feat(parser): read git log into Commit and FileChange dataclasses","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:47+00:00","feat",0,2,2,1,556,0,2,[[12,-1,"A",390,0,0,5,1,2],[13,-1,"A",166,0,0,6,1,2]]],["366d507d7f93d3944387ce40578ab9a547661027","chore: scaffold the gitstory package","Co-Authored-By: Claude Fable 5.2 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_01C7VY4f3mf7koPLn2Rw3Ji1",0,"2026-11-16T18:22:46+00:00","chore",0,1,1,-1,99,0,4,[[25,-1,"A",43,0,0,4,1,1],[26,-1,"A",28,0,0,1,1,1],[27,-1,"A",21,0,0,2,1,1],[28,-1,"A",7,0,0,3,1,1]]]]},"meta":{"version":"0.1.0","generated_at":"2026-11-17T18:44:55+00:00","filters":{},"source":null,"links":[],"download":null}}</script>
 <script>
 /* gitstory report renderer. Reads the embedded JSON and draws everything with
    plain DOM and SVG. Every string that comes from the repository is inserted
    with textContent, never as HTML. */
 (function () {
   'use strict';
+
+  // The page exactly as it arrived, before any drawing: "Download story → HTML"
+  // saves this, so the copy works offline and draws itself again when opened.
+  var PRISTINE = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
 
   var DATA = JSON.parse(document.getElementById('gitstory-data').textContent);
   var root = document.documentElement;
@@ -2156,18 +2259,379 @@ span.cfile-history { cursor: default; border-style: dashed; color: var(--muted);
     var nav = byId('report-nav');
     links.forEach(function (link) {
       // Only same-site paths: the nav is for the local web mode.
-      if (typeof link.href !== 'string' || link.href.charAt(0) !== '/' || link.href.charAt(1) === '/') return;
+      if (!isLocalPath(link.href)) return;
       nav.appendChild(el('a', { href: link.href, text: link.label }));
     });
-    nav.hidden = !nav.children.length;
+    if (nav.children.length) document.body.classList.add('has-nav-links');
+    nav.appendChild(renderDownload());
+    nav.hidden = false;
+  }
+
+  function isLocalPath(href) {
+    return typeof href === 'string' && href.charAt(0) === '/' && href.charAt(1) !== '/';
+  }
+
+  // ---------------------------------------------------------------- download
+
+  var revealAll = function () {};
+
+  var DOWNLOADS = [
+    { kind: 'png', title: 'Long image', ext: '.png',
+      text: 'The whole story as one tall picture, ready to share.' },
+    { kind: 'pdf', title: 'PDF', ext: '.pdf',
+      text: 'A4 pages you can print or attach, split between sections.' },
+    { kind: 'html', title: 'HTML', ext: '.html',
+      text: 'Works offline, anywhere: every chart, the search and the commit history.' }
+  ];
+
+  var ICONS = {
+    png: 'M4 5h16v14H4zM4 15l4.5-4.5 4 4 2.5-2.5L20 17M15.5 9.5h.01',
+    pdf: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 15.5h5M10 19h3',
+    html: 'M8.5 8 4.5 12l4 4M15.5 8l4 4-4 4M13.5 6l-3 12'
+  };
+
+  function icon(kind) {
+    return svg('svg', { viewBox: '0 0 24 24', width: 20, height: 20, 'aria-hidden': 'true' },
+      [svg('path', { d: ICONS[kind] })]);
+  }
+
+  function fileStem() {
+    var stem = String(DATA.repo_name || 'story').replace(/[^\w.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '');
+    return (stem || 'story') + '-gitstory';
+  }
+
+  function renderDownload() {
+    var wrap = el('div', { 'class': 'dl' });
+    var button = el('button', {
+      'class': 'dl-button', type: 'button', id: 'download-button',
+      'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'download-menu'
+    }, [
+      svg('svg', { viewBox: '0 0 24 24', width: 16, height: 16, 'aria-hidden': 'true' },
+        [svg('path', { d: 'M12 4v11M7 10.5l5 5 5-5M5 20h14' })]),
+      'Download story',
+      el('span', { 'class': 'dl-caret', 'aria-hidden': 'true', text: '▾' })
+    ]);
+    var menu = el('div', { 'class': 'dl-menu', id: 'download-menu', role: 'menu', 'aria-label': 'Download story', hidden: 'hidden' });
+    var status = el('p', { 'class': 'dl-status', role: 'status', 'aria-live': 'polite' });
+    var busy = false;
+
+    menu.appendChild(el('p', { 'class': 'dl-menu-title', text: 'Save this story as' }));
+    var items = DOWNLOADS.map(function (option, i) {
+      var item = el('button', { 'class': 'dl-item', type: 'button', role: 'menuitem', 'data-kind': option.kind, style: '--i:' + i }, [
+        el('span', { 'class': 'dl-icon' }, [icon(option.kind)]),
+        el('span', { 'class': 'dl-text' }, [
+          el('strong', { text: option.title }),
+          el('small', { text: option.text })
+        ]),
+        el('span', { 'class': 'dl-ext', text: option.ext })
+      ]);
+      item.addEventListener('click', function () { run(option, item); });
+      menu.appendChild(item);
+      return item;
+    });
+    menu.appendChild(status);
+    menu.appendChild(el('p', { 'class': 'dl-note', text:
+      'The image and PDF show the page as it looks now, so open the commit history first to include it.' }));
+    append(wrap, [button, menu]);
+
+    function open() {
+      if (!menu.hidden) return;
+      menu.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+      wrap.classList.add('is-open');
+      items[0].focus();
+      document.addEventListener('mousedown', outside, true);
+    }
+    function close(refocus) {
+      if (menu.hidden || busy) return;
+      menu.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      wrap.classList.remove('is-open');
+      document.removeEventListener('mousedown', outside, true);
+      if (refocus) button.focus();
+    }
+    function outside(event) { if (!wrap.contains(event.target)) close(false); }
+
+    button.addEventListener('click', function () { if (menu.hidden) open(); else close(true); });
+    wrap.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') { event.preventDefault(); close(true); return; }
+      if (menu.hidden || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
+      event.preventDefault();
+      var at = items.indexOf(document.activeElement);
+      var next = event.key === 'ArrowDown' ? at + 1 : at - 1;
+      items[(next + items.length) % items.length].focus();
+    });
+
+    function say(text, tone) {
+      status.textContent = text;
+      status.className = 'dl-status' + (tone ? ' is-' + tone : '');
+    }
+
+    function run(option, item) {
+      if (busy) return;
+      busy = true;
+      wrap.classList.add('is-busy');
+      items.forEach(function (other) { other.disabled = true; });
+      item.classList.add('is-working');
+      var name = fileStem() + option.ext;
+      var job = option.kind === 'html' ? saveHtml(name)
+        : makeSnapshot(say).then(function (shot) {
+          return option.kind === 'png' ? savePng(shot, name, say) : savePdf(shot, name, say);
+        });
+      job.then(function () {
+        say('Saved ' + name, 'done');
+      }, function (error) {
+        say(error && error.userMessage ? error.userMessage :
+          'Could not make the ' + option.title.toLowerCase() + ' in this browser. Try Chrome, Edge or Firefox, ' +
+          'or download the HTML and use your browser\'s Print → Save as PDF.', 'error');
+        if (window.console) console.error(error);
+      }).then(function () {
+        busy = false;
+        wrap.classList.remove('is-busy');
+        item.classList.remove('is-working');
+        items.forEach(function (other) { other.disabled = false; });
+        item.focus();
+      });
+    }
+
+    return wrap;
+  }
+
+  function saveBlob(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: name });
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  }
+
+  function fail(message) { var error = new Error(message); error.userMessage = message; return error; }
+
+  // HTML: in web mode the server sends a clean copy (no links back to it);
+  // a page opened from a file saves the copy it was opened from.
+  function saveHtml(name) {
+    var server = DATA.meta && DATA.meta.download;
+    if (isLocalPath(server) && /^https?:$/.test(location.protocol)) {
+      return fetch(server).then(function (response) {
+        if (!response.ok) throw fail('The server no longer has this story. Build it again from the home page.');
+        return response.blob();
+      }).then(function (blob) { saveBlob(blob, name); });
+    }
+    var theme = root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    var page = PRISTINE.replace(/(<html\b[^>]*?\bdata-theme=")[^"]*"/, '$1' + theme + '"');
+    saveBlob(new Blob([page], { type: 'text/html;charset=utf-8' }), name);
+    return Promise.resolve();
+  }
+
+  // ---- drawing the page onto a canvas
+  // The visible page is copied into an SVG <foreignObject> with the report's
+  // own stylesheet, every animation finished, and drawn onto a canvas. No
+  // libraries and no network: everything the page needs is already inline.
+
+  var MAX_SIDE = 32000;          // browsers refuse taller canvases
+  var MAX_AREA = 120 * 1000 * 1000;
+  var BREAK_AT = 'h2, h3, p, li, tr, .panel, .tile, .fact, .persona, .commit, .cfile, .history-start, .history-tools, .history-more, .footer';
+
+  function nextFrame() { return new Promise(function (done) { requestAnimationFrame(function () { done(); }); }); }
+
+  function makeSnapshot(say) {
+    say('Getting the page ready…');
+    revealAll();
+    root.classList.add('is-capturing');
+    return nextFrame().then(nextFrame).then(function () {
+      var width = root.clientWidth;
+      var height = Math.ceil(Math.max(document.body.scrollHeight, root.scrollHeight));
+      var breaks = [0];
+      Array.prototype.forEach.call(document.querySelectorAll('main ' + BREAK_AT.split(', ').join(', main ') + ', .footer'), function (node) {
+        if (!node.offsetParent && node.tagName !== 'BODY') return;  // not displayed
+        var y = Math.round(node.getBoundingClientRect().top + window.pageYOffset);
+        if (y > 0 && y < height) breaks.push(y);
+      });
+      breaks.sort(function (a, b) { return a - b; });
+      var source = shotMarkup(width, height);
+      root.classList.remove('is-capturing');
+      say('Drawing the page…');
+      return loadImage(source).then(function (image) {
+        var scale = Math.min(2, MAX_SIDE / height, Math.sqrt(MAX_AREA / (width * height)));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.floor(width * scale));
+        canvas.height = Math.max(1, Math.floor(height * scale));
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = cssVar('--bg') || '#0a1020';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        return { canvas: canvas, width: width, height: height, scale: canvas.width / width, breaks: breaks };
+      });
+    }, function (error) { root.classList.remove('is-capturing'); throw error; });
+  }
+
+  function cssVar(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
+
+  function shotMarkup(width, height) {
+    var css = Array.prototype.map.call(document.querySelectorAll('style'), function (s) { return s.textContent; }).join('\n');
+    // Custom properties live on :root, which a copied <body> does not have.
+    var vars = {};
+    (css.match(/--[\w-]+(?=\s*:)/g) || []).forEach(function (name) { vars[name] = cssVar(name); });
+    var inline = Object.keys(vars).map(function (name) { return name + ':' + vars[name]; }).join(';');
+
+    var body = document.body.cloneNode(true);
+    Array.prototype.forEach.call(body.querySelectorAll('script, noscript, .tooltip, .theme-toggle, .report-nav'), function (node) { node.remove(); });
+    Array.prototype.forEach.call(body.querySelectorAll('.reveal'), function (node) { node.classList.add('is-visible'); });
+    Array.prototype.forEach.call(body.querySelectorAll('.num[data-count]'), function (node) {
+      node.textContent = (node.getAttribute('data-prefix') || '') + fmtNum(+node.getAttribute('data-count'));
+    });
+    var clip = body.querySelector('#tl-clip rect');
+    if (clip) clip.setAttribute('width', '100000');
+    // Typed text lives in a property, not an attribute; copy it across.
+    var liveInputs = document.body.querySelectorAll('input'), copies = body.querySelectorAll('input');
+    Array.prototype.forEach.call(copies, function (input, i) { if (liveInputs[i]) input.setAttribute('value', liveInputs[i].value); });
+
+    body.setAttribute('data-theme', root.getAttribute('data-theme') || 'dark');
+    body.setAttribute('style', inline + ';margin:0;width:' + width + 'px;height:' + height + 'px;overflow:hidden');
+    var style = document.createElement('style');
+    style.textContent = css + '\n*,*::before,*::after{animation:none!important;transition:none!important}';
+    body.insertBefore(style, body.firstChild);
+
+    var xhtml = new XMLSerializer().serializeToString(body);
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
+      '<foreignObject x="0" y="0" width="100%" height="100%">' + xhtml + '</foreignObject></svg>';
+  }
+
+  function loadImage(markup) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      image.onload = function () { resolve(image); };
+      image.onerror = function () { reject(new Error('the page could not be drawn as an image')); };
+      image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+    });
+  }
+
+  function toBlob(canvas, type, quality) {
+    return new Promise(function (resolve, reject) {
+      try {
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob); else reject(new Error('the browser could not encode the image'));
+        }, type, quality);
+      } catch (error) { reject(error); }   // a "tainted" canvas (Safari) throws here
+    });
+  }
+
+  function savePng(shot, name, say) {
+    say('Saving the image…');
+    return toBlob(shot.canvas, 'image/png').then(function (blob) { saveBlob(blob, name); });
+  }
+
+  // ---- PDF: the drawing cut into A4 pages, each page one JPEG.
+  var A4 = { w: 595.28, h: 841.89 };
+
+  function pageSlices(shot) {
+    var pageHeight = Math.floor(shot.width * A4.h / A4.w);
+    var pad = 28;                      // breathing room above the content on later pages
+    var slices = [], y = 0;
+    while (y < shot.height - 2) {
+      var room = pageHeight - (slices.length ? pad : 0);
+      var end = y + room;
+      if (end >= shot.height) { end = shot.height; }
+      else {
+        // Cut just above the last block that starts on this page, unless
+        // that would leave the page less than half full.
+        var cut = end;
+        for (var i = shot.breaks.length - 1; i >= 0; i--) {
+          var b = shot.breaks[i] - 12;
+          if (b <= end && b > y + room * 0.5) { cut = b; break; }
+          if (b <= y + room * 0.5) break;
+        }
+        end = cut;
+      }
+      slices.push({ top: y, height: end - y, pad: slices.length ? pad : 0, pageHeight: pageHeight });
+      y = end;
+    }
+    return slices;
+  }
+
+  function savePdf(shot, name, say) {
+    var slices = pageSlices(shot);
+    var scale = shot.scale, background = cssVar('--bg') || '#0a1020';
+    var pages = [];
+    var chain = Promise.resolve();
+    slices.forEach(function (slice, i) {
+      chain = chain.then(function () {
+        say('Laying out page ' + (i + 1) + ' of ' + slices.length + '…');
+        var page = document.createElement('canvas');
+        page.width = Math.round(shot.width * scale);
+        page.height = Math.round(slice.pageHeight * scale);
+        var ctx = page.getContext('2d');
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, page.width, page.height);
+        var sy = Math.round(slice.top * scale), sh = Math.round(slice.height * scale);
+        ctx.drawImage(shot.canvas, 0, sy, shot.canvas.width, sh, 0, Math.round(slice.pad * scale), page.width, sh);
+        return toBlob(page, 'image/jpeg', 0.9).then(function (blob) { return blob.arrayBuffer(); }).then(function (buffer) {
+          pages.push({ bytes: new Uint8Array(buffer), width: page.width, height: page.height });
+        });
+      });
+    });
+    return chain.then(function () {
+      say('Saving the PDF…');
+      saveBlob(buildPdf(pages, DATA.repo_name + ' · gitstory'), name);
+    });
+  }
+
+  function pdfText(text) {
+    // UTF-16BE with a byte-order mark, as hex: safe for any title.
+    var hex = 'FEFF';
+    for (var i = 0; i < text.length; i++) hex += ('000' + text.charCodeAt(i).toString(16)).slice(-4).toUpperCase();
+    return '<' + hex + '>';
+  }
+
+  function buildPdf(pages, title) {
+    var encoder = new TextEncoder();
+    var parts = [], offsets = [], length = 0;
+    function add(chunk) {
+      var bytes = typeof chunk === 'string' ? encoder.encode(chunk) : chunk;
+      parts.push(bytes);
+      length += bytes.length;
+    }
+    function object(id, body, stream) {
+      offsets[id] = length;
+      add(id + ' 0 obj\n' + body + '\n');
+      if (stream) { add('stream\n'); add(stream); add('\nendstream\n'); }
+      add('endobj\n');
+    }
+    var w = A4.w.toFixed(2), h = A4.h.toFixed(2);
+    add('%PDF-1.4\n');
+    add(new Uint8Array([0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A]));
+    var kids = pages.map(function (_, i) { return (4 + i * 3) + ' 0 R'; }).join(' ');
+    object(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    object(2, '<< /Type /Pages /Kids [' + kids + '] /Count ' + pages.length + ' >>');
+    object(3, '<< /Title ' + pdfText(title) + ' /Creator (gitstory) /Producer (gitstory) >>');
+    pages.forEach(function (page, i) {
+      var id = 4 + i * 3;
+      var draw = encoder.encode('q ' + w + ' 0 0 ' + h + ' 0 0 cm /Im0 Do Q');
+      object(id, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + w + ' ' + h + '] ' +
+        '/Resources << /XObject << /Im0 ' + (id + 2) + ' 0 R >> >> /Contents ' + (id + 1) + ' 0 R >>');
+      object(id + 1, '<< /Length ' + draw.length + ' >>', draw);
+      object(id + 2, '<< /Type /XObject /Subtype /Image /Width ' + page.width + ' /Height ' + page.height +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + page.bytes.length + ' >>', page.bytes);
+    });
+    var count = 3 + pages.length * 3;
+    var xref = length;
+    var table = 'xref\n0 ' + (count + 1) + '\n0000000000 65535 f \n';
+    for (var id = 1; id <= count; id++) table += ('000000000' + offsets[id]).slice(-10) + ' 00000 n \n';
+    add(table);
+    add('trailer\n<< /Size ' + (count + 1) + ' /Root 1 0 R /Info 3 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+    return new Blob(parts, { type: 'application/pdf' });
   }
 
   function setupReveal(hooks) {
     var sections = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
     function show(section) {
+      if (section.classList.contains('is-visible')) return;
       section.classList.add('is-visible');
       if (hooks[section.id]) hooks[section.id]();
     }
+    revealAll = function () { sections.forEach(show); };
     if (reduceMotion || !('IntersectionObserver' in window)) { sections.forEach(show); return; }
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
