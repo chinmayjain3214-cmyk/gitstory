@@ -1243,7 +1243,15 @@
   var MAX_AREA = 120 * 1000 * 1000;
   var BREAK_AT = 'h2, h3, p, li, tr, .panel, .tile, .fact, .persona, .commit, .cfile, .history-start, .history-tools, .history-more, .footer';
 
-  function nextFrame() { return new Promise(function (done) { requestAnimationFrame(function () { done(); }); }); }
+  // One painted frame; a timer backs it up because hidden tabs pause animation frames.
+  function nextFrame() {
+    return new Promise(function (done) {
+      var finished = false;
+      function go() { if (!finished) { finished = true; done(); } }
+      requestAnimationFrame(go);
+      setTimeout(go, 120);
+    });
+  }
 
   function makeSnapshot(say) {
     say('Getting the page ready…');
