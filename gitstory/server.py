@@ -13,7 +13,7 @@ Routes::
     POST /api/stories   {"url": ...}     start (or reuse) a job, 202 + job JSON
     GET  /api/stories/<id>               job status and progress
     GET  /story/<owner>/<repo>           the finished report
-    GET  /story/<owner>/<repo>/download  the same report as a standalone file
+    GET  /story/<owner>/<repo>/download  the same report as a standalone offline file
 
 Only the standard library is used. The server binds to 127.0.0.1 by default,
 only accepts JSON for POSTs (so other websites cannot submit forms to it) and
@@ -311,11 +311,9 @@ class StoryHandler(BaseHTTPRequestHandler):
             filename = f"{repo.name}-gitstory.html".replace('"', "")
             self._html(HTTPStatus.OK, document, {"Content-Disposition": f'attachment; filename="{filename}"'})
             return
-        links = [
-            {"label": "← New story", "href": "/"},
-            {"label": "Download HTML", "href": f"{job.report_path}/download"},
-        ]
-        self._html(HTTPStatus.OK, render_report(job.report, source=source, links=links))
+        links = [{"label": "← New story", "href": "/"}]
+        document = render_report(job.report, source=source, links=links, download=f"{job.report_path}/download")
+        self._html(HTTPStatus.OK, document)
 
 
 def _not_found_page() -> str:

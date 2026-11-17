@@ -126,13 +126,17 @@ def test_full_story_flow(site):
     status, _, page = request(base + job["report_url"])
     assert status == 200
     text = page.decode()
-    assert "github.com/grace/compiler" in text and "Download HTML" in text
+    assert "github.com/grace/compiler" in text
+    assert '"download":"/story/grace/compiler/download"' in text
+    assert "New story" in text
     assert text.count("</script>") == 2  # the commit message containing </script> stayed escaped
 
     status, headers, download = request(base + job["report_url"] + "/download")
     assert status == 200
     assert headers["Content-Disposition"] == 'attachment; filename="compiler-gitstory.html"'
-    assert "Download HTML" not in download.decode()
+    offline = download.decode()
+    assert '"download":null' in offline and '"links":[]' in offline  # nothing points back at the server
+    assert "<script src" not in offline and "<link" not in offline  # everything is inline
 
     # Asking again reuses the finished story instead of cloning twice.
     again = json.loads(request(base + "/api/stories", {"url": "grace/compiler"})[2])

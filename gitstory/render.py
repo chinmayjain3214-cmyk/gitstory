@@ -64,12 +64,15 @@ def build_payload(
     filters: Optional[Mapping[str, Optional[str]]] = None,
     source: Optional[Mapping[str, str]] = None,
     links: Optional[Sequence[Mapping[str, str]]] = None,
+    download: Optional[str] = None,
 ) -> Dict[str, Any]:
     """The JSON document embedded in the page: the report plus some metadata.
 
     ``source`` (``{"label", "url"}``) is shown under the title, for reports of
     a GitHub repository. ``links`` (``[{"label", "href"}]``) adds a small
-    navigation bar; the web mode uses it for "New story" and "Download".
+    navigation bar; the web mode uses it for "New story". ``download`` is a
+    same-site path that serves the offline HTML copy; without it the page
+    saves a copy of itself.
     """
     payload = report.to_dict()
     payload["meta"] = {
@@ -78,6 +81,7 @@ def build_payload(
         "filters": {key: value for key, value in (filters or {}).items() if value},
         "source": dict(source) if source else None,
         "links": [dict(link) for link in links] if links else [],
+        "download": download,
     }
     return payload
 
@@ -99,6 +103,7 @@ def render_report(
     filters: Optional[Mapping[str, Optional[str]]] = None,
     source: Optional[Mapping[str, str]] = None,
     links: Optional[Sequence[Mapping[str, str]]] = None,
+    download: Optional[str] = None,
 ) -> str:
     """Return the complete HTML document for ``report`` as a string."""
     _check_theme(theme)
@@ -107,7 +112,7 @@ def render_report(
         "THEME": theme,
         "CSS": load_asset("report.css"),
         "JS": load_asset("report.js"),
-        "DATA": to_script_safe_json(build_payload(report, generated_at, filters, source, links)),
+        "DATA": to_script_safe_json(build_payload(report, generated_at, filters, source, links, download)),
     })
 
 

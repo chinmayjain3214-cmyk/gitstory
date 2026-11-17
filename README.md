@@ -10,7 +10,7 @@ Point it at a local git repository, or paste a GitHub link, and get a single sel
 
 ## Features
 
-- **Web mode**: run `gitstory --serve`, paste a GitHub link into the page, confirm, and watch the story build with live progress. Download the result as a single file.
+- **Web mode**: run `gitstory --serve`, paste a GitHub link into the page, confirm, and watch the story build with live progress. Save the result from the **Download story** menu.
 - **GitHub links on the command line**: `gitstory https://github.com/owner/repo` clones and reports in one step.
 - **Hero summary**: repository name, first and latest commit, total commits, contributors, lines added and removed, and project age, with numbers that count up on load.
 - **Animated timeline**: commits per week, drawn left to right. Hover (or use the arrow keys) to see the week, its commit count and its top commit message.
@@ -20,6 +20,7 @@ Point it at a local git repository, or paste a GitHub link, and get a single sel
 - **Commit history**: press the button to load the latest 10 commits, then 10 more at a time. Open a commit to see its full message and every file it changed (new, deleted, renamed or edited, with lines added and removed), plus each file's history: "change 9 of 14". Click that to list every commit that ever touched the file, even across renames. Search by message, author, hash or file name, filter by commit type, copy a hash, or open the commit on GitHub.
 - **Commit message insights**: average length, most common words, share of conventional-commit prefixes, and the longest and shortest messages.
 - **Fun facts**: biggest single commit, longest streak, longest gap and busiest day ever. Click a commit hash to jump to it in the commit history.
+- **Download story**: one button, three formats. A **long image** (one tall PNG of the whole page), a **PDF** (A4 pages, split between sections rather than through them), or an **HTML** file that works offline from any folder, with every chart, the search and the commit history. Image and PDF are drawn in your browser from the page as it looks now, so open the commit history first to include it.
 - **One file, zero requests**: all CSS, JavaScript and data are inlined. Charts are hand-drawn SVG, with no chart library and no CDN.
 - **Dark and light themes**, a responsive layout down to phone width, scroll-in animations, and full support for `prefers-reduced-motion`.
 - **Standard library only**: Python 3.9+ and `git`. Nothing else to install.
@@ -67,7 +68,7 @@ This starts a small website on your own computer (http://localhost:8765) and ope
 1. The home page explains what gitstory does and asks for a GitHub repository link.
 2. Paste a link and press **Continue**. gitstory shows which repository it found so you can check it.
 3. Press **Confirm and build the story**. The page shows each step as it happens: downloading, reading every commit, drawing the story.
-4. The story opens in the same tab, with buttons to start a **New story** or **Download HTML**.
+4. The story opens in the same tab, with buttons to start a **New story** or **Download story** (long image, PDF or offline HTML).
 
 ![The gitstory home page](docs/home.png)
 
@@ -177,7 +178,7 @@ browser                          gitstory --serve
   │  POST /api/resolve {url}  ──►  check the link   ──►  {owner, name}
   │  POST /api/stories {url}  ──►  start a job      ──►  {id, state}
   │  GET  /api/stories/<id>   ──►  cloning 45% … analysing … done
-  └► GET  /story/<owner>/<repo>    the report, with "New story" and "Download HTML"
+  └► GET  /story/<owner>/<repo>    the report, with "New story" and "Download story"
 ```
 
 ### Project layout
@@ -228,6 +229,8 @@ Where the idea left room for interpretation, these are the choices gitstory make
 - **Languages** are inferred from file extensions with a small built-in table; unknown extensions are shown as they are.
 - **Template location**: the HTML, CSS and JS live as package-data files in `gitstory/assets/` rather than in one Python string, so they get proper editor support.
 - **A theme toggle** is included in the report in addition to `--theme`.
+- **Image and PDF export** need no library: the page is copied into an SVG `<foreignObject>` with its own stylesheet and every animation finished, drawn onto a canvas, and saved as PNG. The PDF is that drawing cut into A4 pages (each page a JPEG, written by a tiny built-in PDF writer), with cuts placed just above a heading, card or commit. The text in the PDF is therefore not selectable; for that, open the HTML file and use the browser's Print → Save as PDF. Very long pages are drawn at a lower resolution to stay within browser canvas limits. Safari may refuse to export the image or PDF; Chrome, Edge and Firefox work.
+- **The offline HTML** is the report exactly as it was generated, saved with the theme you picked. In web mode the server sends a copy without the links back to it; a report opened from a file saves the copy it was opened from.
 - **Web mode runs locally.** The repository is cloned and analysed on your own computer, so there is no hosted service to sign up for. Only `github.com` links are accepted, the server listens on `127.0.0.1` by default, and it refuses requests from other websites (it only accepts JSON and checks the `Host` header).
 - **Remote repositories**: only the default branch is cloned. The clone downloads the whole history once (needed for line counts), so very large projects take a while; the clone is stopped after 15 minutes. Private repositories work only if your own git credentials can read them; gitstory never asks for a password.
 
@@ -246,7 +249,7 @@ The suite covers the parser (merges, binary files, both rename notations, quoted
 - GitHub API mode: add pull requests, issues and releases to the story.
 - A hosted version of the web mode, so people can use it without installing anything.
 - Compare two repositories, or two periods of the same one, side by side.
-- Export the report, or single charts, as PNG.
+- Export single charts as images.
 - `--exclude` patterns for lockfiles and generated code.
 - Per-contributor pages and a yearly "wrapped" view.
 - Translations of the report text.

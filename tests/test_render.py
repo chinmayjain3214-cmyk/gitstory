@@ -86,3 +86,11 @@ def test_theme_and_title():
 def test_write_report_creates_parent_folders(tmp_path):
     target = write_report("<p>café</p>", tmp_path / "nested" / "out.html")
     assert target.read_text(encoding="utf-8") == "<p>café</p>"
+
+
+def test_download_path_is_embedded_only_in_web_mode():
+    plain = _embedded_data(render_report(_report()))
+    assert plain["meta"]["download"] is None and plain["meta"]["links"] == []
+    served = _embedded_data(render_report(_report(), links=[{"label": "← New story", "href": "/"}],
+                                          download="/story/a/b/download"))
+    assert served["meta"]["download"] == "/story/a/b/download"

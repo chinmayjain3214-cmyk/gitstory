@@ -4,6 +4,10 @@
 (function () {
   'use strict';
 
+  // The page exactly as it arrived, before any drawing: "Download story → HTML"
+  // saves this, so the copy works offline and draws itself again when opened.
+  var PRISTINE = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
   var DATA = JSON.parse(document.getElementById('gitstory-data').textContent);
   var root = document.documentElement;
   var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1064,18 +1068,379 @@
     var nav = byId('report-nav');
     links.forEach(function (link) {
       // Only same-site paths: the nav is for the local web mode.
-      if (typeof link.href !== 'string' || link.href.charAt(0) !== '/' || link.href.charAt(1) === '/') return;
+      if (!isLocalPath(link.href)) return;
       nav.appendChild(el('a', { href: link.href, text: link.label }));
     });
-    nav.hidden = !nav.children.length;
+    if (nav.children.length) document.body.classList.add('has-nav-links');
+    nav.appendChild(renderDownload());
+    nav.hidden = false;
+  }
+
+  function isLocalPath(href) {
+    return typeof href === 'string' && href.charAt(0) === '/' && href.charAt(1) !== '/';
+  }
+
+  // ---------------------------------------------------------------- download
+
+  var revealAll = function () {};
+
+  var DOWNLOADS = [
+    { kind: 'png', title: 'Long image', ext: '.png',
+      text: 'The whole story as one tall picture, ready to share.' },
+    { kind: 'pdf', title: 'PDF', ext: '.pdf',
+      text: 'A4 pages you can print or attach, split between sections.' },
+    { kind: 'html', title: 'HTML', ext: '.html',
+      text: 'Works offline, anywhere: every chart, the search and the commit history.' }
+  ];
+
+  var ICONS = {
+    png: 'M4 5h16v14H4zM4 15l4.5-4.5 4 4 2.5-2.5L20 17M15.5 9.5h.01',
+    pdf: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 15.5h5M10 19h3',
+    html: 'M8.5 8 4.5 12l4 4M15.5 8l4 4-4 4M13.5 6l-3 12'
+  };
+
+  function icon(kind) {
+    return svg('svg', { viewBox: '0 0 24 24', width: 20, height: 20, 'aria-hidden': 'true' },
+      [svg('path', { d: ICONS[kind] })]);
+  }
+
+  function fileStem() {
+    var stem = String(DATA.repo_name || 'story').replace(/[^\w.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '');
+    return (stem || 'story') + '-gitstory';
+  }
+
+  function renderDownload() {
+    var wrap = el('div', { 'class': 'dl' });
+    var button = el('button', {
+      'class': 'dl-button', type: 'button', id: 'download-button',
+      'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'download-menu'
+    }, [
+      svg('svg', { viewBox: '0 0 24 24', width: 16, height: 16, 'aria-hidden': 'true' },
+        [svg('path', { d: 'M12 4v11M7 10.5l5 5 5-5M5 20h14' })]),
+      'Download story',
+      el('span', { 'class': 'dl-caret', 'aria-hidden': 'true', text: '▾' })
+    ]);
+    var menu = el('div', { 'class': 'dl-menu', id: 'download-menu', role: 'menu', 'aria-label': 'Download story', hidden: 'hidden' });
+    var status = el('p', { 'class': 'dl-status', role: 'status', 'aria-live': 'polite' });
+    var busy = false;
+
+    menu.appendChild(el('p', { 'class': 'dl-menu-title', text: 'Save this story as' }));
+    var items = DOWNLOADS.map(function (option, i) {
+      var item = el('button', { 'class': 'dl-item', type: 'button', role: 'menuitem', 'data-kind': option.kind, style: '--i:' + i }, [
+        el('span', { 'class': 'dl-icon' }, [icon(option.kind)]),
+        el('span', { 'class': 'dl-text' }, [
+          el('strong', { text: option.title }),
+          el('small', { text: option.text })
+        ]),
+        el('span', { 'class': 'dl-ext', text: option.ext })
+      ]);
+      item.addEventListener('click', function () { run(option, item); });
+      menu.appendChild(item);
+      return item;
+    });
+    menu.appendChild(status);
+    menu.appendChild(el('p', { 'class': 'dl-note', text:
+      'The image and PDF show the page as it looks now, so open the commit history first to include it.' }));
+    append(wrap, [button, menu]);
+
+    function open() {
+      if (!menu.hidden) return;
+      menu.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+      wrap.classList.add('is-open');
+      items[0].focus();
+      document.addEventListener('mousedown', outside, true);
+    }
+    function close(refocus) {
+      if (menu.hidden || busy) return;
+      menu.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      wrap.classList.remove('is-open');
+      document.removeEventListener('mousedown', outside, true);
+      if (refocus) button.focus();
+    }
+    function outside(event) { if (!wrap.contains(event.target)) close(false); }
+
+    button.addEventListener('click', function () { if (menu.hidden) open(); else close(true); });
+    wrap.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') { event.preventDefault(); close(true); return; }
+      if (menu.hidden || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
+      event.preventDefault();
+      var at = items.indexOf(document.activeElement);
+      var next = event.key === 'ArrowDown' ? at + 1 : at - 1;
+      items[(next + items.length) % items.length].focus();
+    });
+
+    function say(text, tone) {
+      status.textContent = text;
+      status.className = 'dl-status' + (tone ? ' is-' + tone : '');
+    }
+
+    function run(option, item) {
+      if (busy) return;
+      busy = true;
+      wrap.classList.add('is-busy');
+      items.forEach(function (other) { other.disabled = true; });
+      item.classList.add('is-working');
+      var name = fileStem() + option.ext;
+      var job = option.kind === 'html' ? saveHtml(name)
+        : makeSnapshot(say).then(function (shot) {
+          return option.kind === 'png' ? savePng(shot, name, say) : savePdf(shot, name, say);
+        });
+      job.then(function () {
+        say('Saved ' + name, 'done');
+      }, function (error) {
+        say(error && error.userMessage ? error.userMessage :
+          'Could not make the ' + option.title.toLowerCase() + ' in this browser. Try Chrome, Edge or Firefox, ' +
+          'or download the HTML and use your browser\'s Print → Save as PDF.', 'error');
+        if (window.console) console.error(error);
+      }).then(function () {
+        busy = false;
+        wrap.classList.remove('is-busy');
+        item.classList.remove('is-working');
+        items.forEach(function (other) { other.disabled = false; });
+        item.focus();
+      });
+    }
+
+    return wrap;
+  }
+
+  function saveBlob(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: name });
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  }
+
+  function fail(message) { var error = new Error(message); error.userMessage = message; return error; }
+
+  // HTML: in web mode the server sends a clean copy (no links back to it);
+  // a page opened from a file saves the copy it was opened from.
+  function saveHtml(name) {
+    var server = DATA.meta && DATA.meta.download;
+    if (isLocalPath(server) && /^https?:$/.test(location.protocol)) {
+      return fetch(server).then(function (response) {
+        if (!response.ok) throw fail('The server no longer has this story. Build it again from the home page.');
+        return response.blob();
+      }).then(function (blob) { saveBlob(blob, name); });
+    }
+    var theme = root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    var page = PRISTINE.replace(/(<html\b[^>]*?\bdata-theme=")[^"]*"/, '$1' + theme + '"');
+    saveBlob(new Blob([page], { type: 'text/html;charset=utf-8' }), name);
+    return Promise.resolve();
+  }
+
+  // ---- drawing the page onto a canvas
+  // The visible page is copied into an SVG <foreignObject> with the report's
+  // own stylesheet, every animation finished, and drawn onto a canvas. No
+  // libraries and no network: everything the page needs is already inline.
+
+  var MAX_SIDE = 32000;          // browsers refuse taller canvases
+  var MAX_AREA = 120 * 1000 * 1000;
+  var BREAK_AT = 'h2, h3, p, li, tr, .panel, .tile, .fact, .persona, .commit, .cfile, .history-start, .history-tools, .history-more, .footer';
+
+  function nextFrame() { return new Promise(function (done) { requestAnimationFrame(function () { done(); }); }); }
+
+  function makeSnapshot(say) {
+    say('Getting the page ready…');
+    revealAll();
+    root.classList.add('is-capturing');
+    return nextFrame().then(nextFrame).then(function () {
+      var width = root.clientWidth;
+      var height = Math.ceil(Math.max(document.body.scrollHeight, root.scrollHeight));
+      var breaks = [0];
+      Array.prototype.forEach.call(document.querySelectorAll('main ' + BREAK_AT.split(', ').join(', main ') + ', .footer'), function (node) {
+        if (!node.offsetParent && node.tagName !== 'BODY') return;  // not displayed
+        var y = Math.round(node.getBoundingClientRect().top + window.pageYOffset);
+        if (y > 0 && y < height) breaks.push(y);
+      });
+      breaks.sort(function (a, b) { return a - b; });
+      var source = shotMarkup(width, height);
+      root.classList.remove('is-capturing');
+      say('Drawing the page…');
+      return loadImage(source).then(function (image) {
+        var scale = Math.min(2, MAX_SIDE / height, Math.sqrt(MAX_AREA / (width * height)));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.floor(width * scale));
+        canvas.height = Math.max(1, Math.floor(height * scale));
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = cssVar('--bg') || '#0a1020';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        return { canvas: canvas, width: width, height: height, scale: canvas.width / width, breaks: breaks };
+      });
+    }, function (error) { root.classList.remove('is-capturing'); throw error; });
+  }
+
+  function cssVar(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
+
+  function shotMarkup(width, height) {
+    var css = Array.prototype.map.call(document.querySelectorAll('style'), function (s) { return s.textContent; }).join('\n');
+    // Custom properties live on :root, which a copied <body> does not have.
+    var vars = {};
+    (css.match(/--[\w-]+(?=\s*:)/g) || []).forEach(function (name) { vars[name] = cssVar(name); });
+    var inline = Object.keys(vars).map(function (name) { return name + ':' + vars[name]; }).join(';');
+
+    var body = document.body.cloneNode(true);
+    Array.prototype.forEach.call(body.querySelectorAll('script, noscript, .tooltip, .theme-toggle, .report-nav'), function (node) { node.remove(); });
+    Array.prototype.forEach.call(body.querySelectorAll('.reveal'), function (node) { node.classList.add('is-visible'); });
+    Array.prototype.forEach.call(body.querySelectorAll('.num[data-count]'), function (node) {
+      node.textContent = (node.getAttribute('data-prefix') || '') + fmtNum(+node.getAttribute('data-count'));
+    });
+    var clip = body.querySelector('#tl-clip rect');
+    if (clip) clip.setAttribute('width', '100000');
+    // Typed text lives in a property, not an attribute; copy it across.
+    var liveInputs = document.body.querySelectorAll('input'), copies = body.querySelectorAll('input');
+    Array.prototype.forEach.call(copies, function (input, i) { if (liveInputs[i]) input.setAttribute('value', liveInputs[i].value); });
+
+    body.setAttribute('data-theme', root.getAttribute('data-theme') || 'dark');
+    body.setAttribute('style', inline + ';margin:0;width:' + width + 'px;height:' + height + 'px;overflow:hidden');
+    var style = document.createElement('style');
+    style.textContent = css + '\n*,*::before,*::after{animation:none!important;transition:none!important}';
+    body.insertBefore(style, body.firstChild);
+
+    var xhtml = new XMLSerializer().serializeToString(body);
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
+      '<foreignObject x="0" y="0" width="100%" height="100%">' + xhtml + '</foreignObject></svg>';
+  }
+
+  function loadImage(markup) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      image.onload = function () { resolve(image); };
+      image.onerror = function () { reject(new Error('the page could not be drawn as an image')); };
+      image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+    });
+  }
+
+  function toBlob(canvas, type, quality) {
+    return new Promise(function (resolve, reject) {
+      try {
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob); else reject(new Error('the browser could not encode the image'));
+        }, type, quality);
+      } catch (error) { reject(error); }   // a "tainted" canvas (Safari) throws here
+    });
+  }
+
+  function savePng(shot, name, say) {
+    say('Saving the image…');
+    return toBlob(shot.canvas, 'image/png').then(function (blob) { saveBlob(blob, name); });
+  }
+
+  // ---- PDF: the drawing cut into A4 pages, each page one JPEG.
+  var A4 = { w: 595.28, h: 841.89 };
+
+  function pageSlices(shot) {
+    var pageHeight = Math.floor(shot.width * A4.h / A4.w);
+    var pad = 28;                      // breathing room above the content on later pages
+    var slices = [], y = 0;
+    while (y < shot.height - 2) {
+      var room = pageHeight - (slices.length ? pad : 0);
+      var end = y + room;
+      if (end >= shot.height) { end = shot.height; }
+      else {
+        // Cut just above the last block that starts on this page, unless
+        // that would leave the page less than half full.
+        var cut = end;
+        for (var i = shot.breaks.length - 1; i >= 0; i--) {
+          var b = shot.breaks[i] - 12;
+          if (b <= end && b > y + room * 0.5) { cut = b; break; }
+          if (b <= y + room * 0.5) break;
+        }
+        end = cut;
+      }
+      slices.push({ top: y, height: end - y, pad: slices.length ? pad : 0, pageHeight: pageHeight });
+      y = end;
+    }
+    return slices;
+  }
+
+  function savePdf(shot, name, say) {
+    var slices = pageSlices(shot);
+    var scale = shot.scale, background = cssVar('--bg') || '#0a1020';
+    var pages = [];
+    var chain = Promise.resolve();
+    slices.forEach(function (slice, i) {
+      chain = chain.then(function () {
+        say('Laying out page ' + (i + 1) + ' of ' + slices.length + '…');
+        var page = document.createElement('canvas');
+        page.width = Math.round(shot.width * scale);
+        page.height = Math.round(slice.pageHeight * scale);
+        var ctx = page.getContext('2d');
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, page.width, page.height);
+        var sy = Math.round(slice.top * scale), sh = Math.round(slice.height * scale);
+        ctx.drawImage(shot.canvas, 0, sy, shot.canvas.width, sh, 0, Math.round(slice.pad * scale), page.width, sh);
+        return toBlob(page, 'image/jpeg', 0.9).then(function (blob) { return blob.arrayBuffer(); }).then(function (buffer) {
+          pages.push({ bytes: new Uint8Array(buffer), width: page.width, height: page.height });
+        });
+      });
+    });
+    return chain.then(function () {
+      say('Saving the PDF…');
+      saveBlob(buildPdf(pages, DATA.repo_name + ' · gitstory'), name);
+    });
+  }
+
+  function pdfText(text) {
+    // UTF-16BE with a byte-order mark, as hex: safe for any title.
+    var hex = 'FEFF';
+    for (var i = 0; i < text.length; i++) hex += ('000' + text.charCodeAt(i).toString(16)).slice(-4).toUpperCase();
+    return '<' + hex + '>';
+  }
+
+  function buildPdf(pages, title) {
+    var encoder = new TextEncoder();
+    var parts = [], offsets = [], length = 0;
+    function add(chunk) {
+      var bytes = typeof chunk === 'string' ? encoder.encode(chunk) : chunk;
+      parts.push(bytes);
+      length += bytes.length;
+    }
+    function object(id, body, stream) {
+      offsets[id] = length;
+      add(id + ' 0 obj\n' + body + '\n');
+      if (stream) { add('stream\n'); add(stream); add('\nendstream\n'); }
+      add('endobj\n');
+    }
+    var w = A4.w.toFixed(2), h = A4.h.toFixed(2);
+    add('%PDF-1.4\n');
+    add(new Uint8Array([0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A]));
+    var kids = pages.map(function (_, i) { return (4 + i * 3) + ' 0 R'; }).join(' ');
+    object(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    object(2, '<< /Type /Pages /Kids [' + kids + '] /Count ' + pages.length + ' >>');
+    object(3, '<< /Title ' + pdfText(title) + ' /Creator (gitstory) /Producer (gitstory) >>');
+    pages.forEach(function (page, i) {
+      var id = 4 + i * 3;
+      var draw = encoder.encode('q ' + w + ' 0 0 ' + h + ' 0 0 cm /Im0 Do Q');
+      object(id, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + w + ' ' + h + '] ' +
+        '/Resources << /XObject << /Im0 ' + (id + 2) + ' 0 R >> >> /Contents ' + (id + 1) + ' 0 R >>');
+      object(id + 1, '<< /Length ' + draw.length + ' >>', draw);
+      object(id + 2, '<< /Type /XObject /Subtype /Image /Width ' + page.width + ' /Height ' + page.height +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + page.bytes.length + ' >>', page.bytes);
+    });
+    var count = 3 + pages.length * 3;
+    var xref = length;
+    var table = 'xref\n0 ' + (count + 1) + '\n0000000000 65535 f \n';
+    for (var id = 1; id <= count; id++) table += ('000000000' + offsets[id]).slice(-10) + ' 00000 n \n';
+    add(table);
+    add('trailer\n<< /Size ' + (count + 1) + ' /Root 1 0 R /Info 3 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+    return new Blob(parts, { type: 'application/pdf' });
   }
 
   function setupReveal(hooks) {
     var sections = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
     function show(section) {
+      if (section.classList.contains('is-visible')) return;
       section.classList.add('is-visible');
       if (hooks[section.id]) hooks[section.id]();
     }
+    revealAll = function () { sections.forEach(show); };
     if (reduceMotion || !('IntersectionObserver' in window)) { sections.forEach(show); return; }
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
